@@ -264,8 +264,14 @@ bool Tracking::TrackLocalMapWithIMU(bool bMapUpdated)
         if(mCurrentFrame.GetNavState().Get_dBias_Acc().norm() > 1e-6) cerr<<"TrackLocalMapWithIMU current Frame dBias acc not zero"<<endl;
         if(mCurrentFrame.GetNavState().Get_dBias_Gyr().norm() > 1e-6) cerr<<"TrackLocalMapWithIMU current Frame dBias gyr not zero"<<endl;
 
-        //
+        //debug
+        saveDebugStates("../../../tmp/IMUpredic_beforetracklm.txt","../../../tmp/IMUpredict_beforetracklm.txt");
+
+
         Optimizer::PoseOptimization(&mCurrentFrame,mpLastKeyFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
+
+
+        saveDebugStates("../../../tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_aftertracklm.txt");
         //Optimizer::PoseOptimization15DoF(&mCurrentFrame,mpLastKeyFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
 
         //Optimizer::PoseOptimization(&mCurrentFrame,pMapUpdateKF,imupreint,mpLocalMapper->GetGravityVec(),true);
@@ -276,9 +282,16 @@ bool Tracking::TrackLocalMapWithIMU(bool bMapUpdated)
     else
     {
         // Get initial pose from Last Frame
+        
+
+
         IMUPreintegrator imupreint = GetIMUPreIntSinceLastFrame(&mCurrentFrame, &mLastFrame);
 
+        saveDebugStates("../../../tmp/IMUpredic_beforetracklm.txt","../../../tmp/IMUpredict_beforetracklm.txt");
+
         Optimizer::PoseOptimization(&mCurrentFrame,&mLastFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
+
+        saveDebugStates("../../../tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_aftertracklm.txt");
         //Optimizer::PoseOptimization15DoF(&mCurrentFrame,&mLastFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
     }
 
@@ -401,7 +414,7 @@ bool Tracking::TrackWithIMU(bool bMapUpdated)
     int nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,th,mSensor==System::MONOCULAR);
 
     // debug
-    saveDebugStates();
+    saveDebugStates("../../../tmp/IMUpredic_beforetrack.txt","../../../tmp/IMUpredict_beforetrack.txt");
 
     // If few matches, uses a wider window search
     if(nmatches<20)
@@ -432,6 +445,8 @@ bool Tracking::TrackWithIMU(bool bMapUpdated)
         //Optimizer::PoseOptimization15DoF(&mCurrentFrame,&mLastFrame,mIMUPreIntInTrack,mpLocalMapper->GetGravityVec(),false);
     }
 
+    // debug
+     saveDebugStates("../../../tmp/IMUpredic_aftertrack.txt","../../../tmp/IMUpredict_aftertrack.txt");
 
     // Discard outliers
     int nmatchesMap = 0;
@@ -2239,25 +2254,25 @@ void Tracking::InformOnlyTracking(const bool &flag)
     mbOnlyTracking = flag;
 }
 
-void Tracking::saveDebugStates()
+void Tracking::saveDebugStates(const string &IMUfilename,const string &CVMfilename)
 {
     // abbreviation
     // CVM: constant velocity model
 
     // save the state predicted by IMU
     ofstream f;
-    char IMUpredictionFile[] = "../../../tmp/IMUprediction.txt";
-    char CVMpredictionFile[] = "../../../tmp/CVMprediction.txt";
+    //char IMUpredictionFile[] = "../../../tmp/IMUprediction.txt";
+    //char CVMpredictionFile[] = "../../../tmp/CVMprediction.txt";
 
     if (mpLocalMapper->GetVINSInited())
     {
         if (mIsFirstDebug)
         {
-            f.open(IMUpredictionFile, std::ios_base::out);
+            f.open(IMUfilename.c_str(), std::ios_base::out);
         }
         else
         {
-            f.open(IMUpredictionFile, std::ios_base::app);
+            f.open(IMUfilename.c_str(), std::ios_base::app);
         }
         f << fixed;
 
@@ -2285,11 +2300,11 @@ void Tracking::saveDebugStates()
     {
         if (mIsFirstDebug)
         {
-            f.open(CVMpredictionFile, std::ios_base::out);
+            f.open(CVMfilename.c_str(), std::ios_base::out);
         }
         else
         {
-            f.open(CVMpredictionFile, std::ios_base::app);
+            f.open(CVMfilename.c_str(), std::ios_base::app);
         }
         f << fixed;
 
