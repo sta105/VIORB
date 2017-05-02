@@ -249,7 +249,7 @@ protected:
 public:
     bool GetVINSInited();
     cv::Mat GetGravityVec();
-    void saveDebugStates();
+    void saveDebugStates(const string &IMUfilename, const string &CVMfilename);
 
 };
 
