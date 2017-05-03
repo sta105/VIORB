@@ -1,0 +1,153 @@
+%YAML:1.0
+
+test.DiscardTime: 0
+test.VINSInitTime: 25.0
+
+#bagfile: "/home/jp/0226indoor.bag"
+#bagfile: "/media/jp/JingpangPassport/2Data/mono3dm/0322M100/2017-03-22-10-50-33.bag"
+#bagfile: "/media/jp/JingpangPassport/2Data/mono3dm/newcam0328/2017-03-28-17-08-402sexp.bag"
+#bagfile: "/home/jp/0302indoor.bag"
+bagfile: "/home/sicong/VIORB_new/ORB_SLAM2/2017-04-18-15-04-58.bag"
+# #Timestamp shift. Timage = Timu + image_delay
+# imu_stamp = imu_stamp + 0
+# image_stamp = image_stamp - Camera.delaytoimu
+# 10ms exposure ~ -0.018s
+# 0ms exposure ~ -0.018+0.005 = -0.013
+# For outdoor, exposure<1ms, delay 0.01656 - 0.003 
+# #exposure 10ms ~ 0.018xxx
+# 原先的光圈较大的广角镜头
+#Camera.delaytoimu: -0.0141946518568 # 2ms
+#Camera.delaytoimu: -0.0181946518568 #indoor 10ms exp
+Camera.delaytoimu: 0 #0.00540076237756 #TANG SICONG 10ms exp
+
+imutopic: "/imu/imu"
+imagetopic:  "/camera/image_raw" # "/camera/image_raw" # don't use /camera/image_raw as the timestamp may drift
+
+# Not needed as package imgcb has multiplied 9.8
+IMU.multiplyG: 0
+
+# camera-imu frame transformation, Pi = Tic * Pc
+Camera.Tbc:
+ [-0.99908822, -0.01101412, 0.0412482, 0.0132286,
+  -0.01094135, 0.99993816, 0.00198971, -0.05959064,
+  -0.04126757, 0.00153659, -0.99914695, -0.0031245,
+  0.,          0.,          0.,          1.        ]
+
+# Local Window size
+LocalMapping.LocalWindowSize: 10
+
+#--------------------------------------------------------------------------------------------
+# Camera Parameters. Adjust them!
+#--------------------------------------------------------------------------------------------
+
+# #calibration result
+# Camera calibration and distortion parameters (OpenCV) 
+#Camera.bUseDistK6: 1
+#Camera.fx: 634.8392439502446
+#Camera.fy: 635.6364857259297
+#Camera.cx: 367.27581630362755
+#Camera.cy: 268.5125875815041
+#Camera.k1: -0.4771161753774191
+#Camera.k2: 0.1558511132523077
+#Camera.p1: -0.0004658854073601653
+#Camera.p2: 0.0006802731975798733
+#Camera.k3: -0.001977423947767673
+#Camera.k4: -0.0082765074050497
+#Camera.k5: -0.1605014098277964
+#Camera.k6: 0.11803053595983636
+
+Camera.bUseDistK6: 0
+Camera.fx: 457.5271456314974  #637.954258 
+Camera.fy: 457.0066649409353 #638.094959
+Camera.cx: 304.26967947069767 #370.728925
+Camera.cy: 264.2852619534521 #260.960115
+Camera.k1: -0.4087668956508079 #-0.443497
+Camera.k2: 0.15769975734052397 #0.184349
+Camera.p1: -0.0003976549649647362 #0.001412
+Camera.p2: 0.0002381157199711002 #0.000352
+
+
+Camera.width: 640
+Camera.height: 480
+
+# Camera frames per second 
+Camera.fps: 20.0
+
+# IR projector baseline times fx (aprox.)
+Camera.bf: 40.0
+
+# Color order of the images (0: BGR, 1: RGB. It is ignored if images are grayscale)
+Camera.RGB: 1
+
+# Close/Far threshold. Baseline times.
+ThDepth: 40.0
+
+# Deptmap values factor
+DepthMapFactor: 1.0
+
+#--------------------------------------------------------------------------------------------
+# ORB Parameters
+#--------------------------------------------------------------------------------------------
+
+# ORB Extractor: Number of features per image
+#ORBextractor.nFeatures: 600
+ORBextractor.nFeatures: 1000
+
+# ORB Extractor: Scale factor between levels in the scale pyramid 
+ORBextractor.scaleFactor: 1.2
+
+# ORB Extractor: Number of levels in the scale pyramid 
+ORBextractor.nLevels: 8
+
+# ORB Extractor: Fast threshold
+# Image is divided in a grid. At each cell FAST are extracted imposing a minimum response.
+# Firstly we impose iniThFAST. If no corners are detected we impose a lower value minThFAST
+# You can lower these values if your images have low contrast   
+ORBextractor.iniThFAST: 20
+ORBextractor.minThFAST: 7
+
+#--------------------------------------------------------------------------------------------
+# Viewer Parameters
+#--------------------------------------------------------------------------------------------
+Viewer.KeyFrameSize: 0.05
+Viewer.KeyFrameLineWidth: 1
+Viewer.GraphLineWidth: 0.9
+Viewer.PointSize:2
+Viewer.CameraSize: 0.08
+Viewer.CameraLineWidth: 3
+Viewer.ViewpointX: 0
+Viewer.ViewpointY: -0.7
+Viewer.ViewpointZ: -1.8
+Viewer.ViewpointF: 500
+
+
+# 原先的光圈较大的广角镜头
+#Camera.delaytoimu: -0.0133 #outdoor <1ms exp
+#Camera.delaytoimu: -0.0182622836244 #-0.0185643362963 #indoor 10ms exp
+
+# 原先的光圈较大的广角镜头
+# [-0.00160547, -0.99999759,  0.00150048,  0.01572534,
+#  -0.99999813,  0.00160384, -0.00108461,  0.03298366,
+#  0.0010822,  -0.00150222, -0.99999829, -0.03547074,
+#  0.,          0.,          0.,          1.        ]
+# [-0.00160547, -0.99999759,  0.00150048,  0.01572534,
+#  -0.99999813,  0.00160384, -0.00108461,  0.03298366,
+#  0.0010822,  -0.00150222, -0.99999829, -0.03547074,
+#  0.,          0.,          0.,          1.        ]
+
+#原先的大光圈广角镜头
+#Camera.fx: 508.3284651514523 #509.766965 #476.58263033264046 #513.224186 
+#Camera.fy: 508.3073145594467 #509.922733 #470.9367005153789 #515.050972
+#Camera.cx: 372.3139559158257 #371.74284668368153 #347.472457 #375.6980664604492 #386.365660
+#Camera.cy: 269.1701508998824 #274.113573 #263.23699687932134 #274.086469
+
+#Camera.k1: 0.24887376911020412 #0.3003907254710954 #-0.201269 #-0.3432679078112876 #-0.366164 
+#Camera.k2: -0.18715045736311967 #-0.229339862171771 #-0.064574 #0.08397707387837497 #0.109117
+#Camera.p1: 0.0001368125046873453 #-0.000049173540083177316 #-0.000174 #0.0017091758717575232 #-0.000379
+#Camera.p2: -0.00010524967508464667 #0.00010412544022170257 #-0.000012 #0.0010872535222467808 #-0.000451
+
+#Camera.bUseDistK6: 1
+#Camera.k3: 0.01623992364794481 #0.01896484273488511 #0.036859
+#Camera.k4: 0.6713128961854457 #0.7273153054725624 #0.218574
+#Camera.k5: -0.20956905565148926 #-0.2405686486762486 #-0.256168
+#Camera.k6: -0.013574551031432196 #-0.0209974576364713 #0.074948
