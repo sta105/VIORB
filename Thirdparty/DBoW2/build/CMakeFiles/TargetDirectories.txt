@@ -1,1 +1,0 @@
-/home/sicong/VIORB/ORB_SLAM2/Thirdparty/DBoW2/build/CMakeFiles/DBoW2.dir

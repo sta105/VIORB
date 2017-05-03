@@ -1,1 +1,0 @@
-/home/sicong/VIORB/ORB_SLAM2/build/CMakeFiles/ORB_SLAM2.dir
