@@ -120,6 +120,8 @@ public:
     // Input sensor
     int mSensor;
 
+    int trackingcounts=0;
+
     // Current Frame
     Frame mCurrentFrame;
     cv::Mat mImGray;

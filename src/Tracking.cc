@@ -271,7 +271,7 @@ bool Tracking::TrackLocalMapWithIMU(bool bMapUpdated)
         Optimizer::PoseOptimization(&mCurrentFrame,mpLastKeyFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
 
 
-        //saveDebugStates("../../../tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_aftertracklm.txt");
+        //saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_aftertracklm.txt");
         //Optimizer::PoseOptimization15DoF(&mCurrentFrame,mpLastKeyFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
 
         //Optimizer::PoseOptimization(&mCurrentFrame,pMapUpdateKF,imupreint,mpLocalMapper->GetGravityVec(),true);
@@ -291,7 +291,7 @@ bool Tracking::TrackLocalMapWithIMU(bool bMapUpdated)
 
         Optimizer::PoseOptimization(&mCurrentFrame,&mLastFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
 
-        //saveDebugStates("../../../tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_aftertracklm.txt");
+        //saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_aftertracklm.txt");
         //Optimizer::PoseOptimization15DoF(&mCurrentFrame,&mLastFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
     }
 
@@ -324,10 +324,10 @@ bool Tracking::TrackLocalMapWithIMU(bool bMapUpdated)
 
     // Decide if the tracking was succesful
     // More restrictive if there was a relocalization recently
-    if(mCurrentFrame.mnId<mnLastRelocFrameId+mMaxFrames && mnMatchesInliers<50)
+    if(mCurrentFrame.mnId<mnLastRelocFrameId+mMaxFrames && mnMatchesInliers<30)
         return false;
 
-    if(mnMatchesInliers<30)
+    if(mnMatchesInliers<15)
         return false;
     else
         return true;
@@ -402,6 +402,7 @@ bool Tracking::TrackWithIMU(bool bMapUpdated)
     // Predict NavState&Pose by IMU
     // And compute the IMU pre-integration for PoseOptimization
     PredictNavStateByIMU(bMapUpdated);
+    saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_beforetrack.txt","../../../tmp/IMUpredict_aftertracklm.txt");
 
     fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
 
@@ -945,9 +946,11 @@ void Tracking::Track()
                     {
                         // 20 Frames after reloc, track with only vision
                         bOK = TrackLocalMap();
+
                     }
                     else
                     {
+                        cout<<"tracking localmap with imu "<<trackingcounts++<<endl;
                         bOK = TrackLocalMapWithIMU(bMapUpdated);
                     }
                 }
@@ -2277,21 +2280,33 @@ void Tracking::saveDebugStates(const string &IMUfilename,const string &CVMfilena
         f << fixed;
 
         cv::Mat LastTwc = cv::Mat::eye(4,4,CV_32F);
-        mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0,3).colRange(0,3));
-        mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0,3).col(3));
-        cv::Mat predictedRelativePose = mCurrentFrame.mTcw*LastTwc;
-        
-        Eigen::Matrix3d predictedR;
-        predictedR <<   predictedRelativePose.at<float>(0, 0), predictedRelativePose.at<float>(0, 1), predictedRelativePose.at<float>(0, 2), 
-                        predictedRelativePose.at<float>(1, 0), predictedRelativePose.at<float>(1, 1), predictedRelativePose.at<float>(1, 2), 
-                        predictedRelativePose.at<float>(2, 0), predictedRelativePose.at<float>(2, 1), predictedRelativePose.at<float>(2, 2);
 
-        SO3 so3(predictedR);
+        mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0,3).colRange(0,3));
+
+        mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0,3).col(3));
+
+        cv::Mat predictedRelativePose = mCurrentFrame.mTcw*LastTwc;
+
+
+        //Eigen::Matrix3d predictedR;
+         // predictedR <<   predictedRelativePose.at<float>(0, 0), predictedRelativePose.at<float>(0, 1), predictedRelativePose.at<float>(0, 2), 
+         //                 predictedRelativePose.at<float>(1, 0), predictedRelativePose.at<float>(1, 1), predictedRelativePose.at<float>(1, 2), 
+         //                 predictedRelativePose.at<float>(2, 0), predictedRelativePose.at<float>(2, 1), predictedRelativePose.at<float>(2, 2);
+
+        cv::Mat R;// = cv::Mat::eye(3,3,CV_32F);
+
+        //predictedRelativePose.clone().copyTo(R.rowRange(0,3).colRange(0,3));
+        R=predictedRelativePose.rowRange(0,3).colRange(0,3).clone();
+
+        vector<float> q = Converter::toQuaternion(R);
+
+        //SO3 so3(predictedR);
         f << setprecision(6) << mCurrentFrame.mTimeStamp << setprecision(7) << " ";
         f << predictedRelativePose.at<float>(0, 3) << " " << predictedRelativePose.at<float>(1, 3) << " " << predictedRelativePose.at<float>(2, 3) << " ";
-        f << so3.unit_quaternion().x() << " " << so3.unit_quaternion().y() << " " << so3.unit_quaternion().z() << " " << so3.unit_quaternion().w() << " ";
-        f << std::endl;
-        f.close();   
+        f << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << endl;
+        f.close();  
+
+
     }
 
     //save the state by CVM 
