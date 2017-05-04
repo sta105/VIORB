@@ -3,9 +3,7 @@
 import sys
 import numpy as np
 from skinematics import quat, rotmat
-import transforms3d
 import associate
-import math
 from math import pi, sqrt
 import matplotlib.pyplot as plt
 
@@ -16,62 +14,26 @@ T_bc = np.asarray([
             0.0, 0.0, 0.0, 1.0
         ]).reshape(4, 4)
 
-T_cb = np.linalg.inv(T_bc)
-
 if len(sys.argv) < 4:
     print 'Usage: python evalute_motion_priors <groundtruth> <imu_prior> <cvm_prior>'
     exit(0)
 
-# Checks if a matrix is a valid rotation matrix.
-def isRotationMatrix(R) :
-    Rt = np.transpose(R)
-    shouldBeIdentity = np.dot(Rt, R)
-    I = np.identity(3, dtype = R.dtype)
-    n = np.linalg.norm(I - shouldBeIdentity)
-    return n < 1e-6
- 
- 
-# Calculates rotation matrix to euler angles
-# The result is the same as MATLAB except the order
-# of the euler angles ( x and z are swapped ).
-def rotationMatrixToEulerAngles(R) :
- 
-    assert(isRotationMatrix(R))
-     
-    sy = math.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
-     
-    singular = sy < 1e-6
- 
-    if  not singular :
-        x = math.atan2(R[2,1] , R[2,2])
-        y = math.atan2(-R[2,0], sy)
-        z = math.atan2(R[1,0], R[0,0])
-    else :
-        x = math.atan2(-R[1,2], R[1,1])
-        y = math.atan2(-R[2,0], sy)
-        z = 0
- 
-    return np.array([x, y, z])
-
 def toPose(position, quaternion):
-    quaternion = np.asarray(quaternion)
-    quaternion = quaternion / np.linalg.norm(quaternion)
-
-    R = quat.quat2rotmat(quaternion)
+    R = quat.quat2rotmat(np.asarray(quaternion))
     T = np.eye(4)
     T[:3, :3] = R
     T[:3, 3] = np.asarray(position).transpose()
     return T
 
 def navStateToPose(nav_states):
-    nav_states_list = [(i, np.eye(4)) for i in nav_states]
+    nav_states_list = [(i, None) for i in nav_states]
     nav_states_list.sort()
 
     for i in range(len(nav_states_list)):
         p = nav_states[nav_states_list[i][0]][0:3]
         q = nav_states[nav_states_list[i][0]][3:7]
         # convention of ORB-SLAM is x, y, z, w: but we need w, x, y, z for skinematics
-        q = np.asarray([q[3], q[0], q[1], q[2]])
+        q = [q[3], q[0], q[1], q[2]]
         T = toPose(p, q)
 
         nav_states_list[i] = (nav_states_list[i][0], T)
@@ -92,10 +54,7 @@ def absoluteToRelative(absolute):
         q2 = absolute[relative[i][0]][3:7]
         T2 = toPose(p2, q2)
 
-        # relative_T = np.dot(np.linalg.inv(T2), T1)
-        relative_T = np.eye(4)
-        relative_T[:3, :3] = np.dot(T2[:3, :3].transpose(), T1[:3, :3])
-        relative_T[:3, 3] = np.dot(T2[:3, :3].transpose(), T1[:3, 3] - T2[:3, 3])
+        relative_T = np.dot(np.linalg.inv(T2), T1)
         relative[i] = (relative[i][0], relative_T)
 
     return dict(relative)
@@ -112,21 +71,18 @@ cvm_prior = associate.read_file_list(cmv_file)
 imu_cvm_matches = associate.associate(imu_prior, cvm_prior, offset=0.0, max_difference=0.02)
 imu_prior = {i[0]: imu_prior[ i[0] ] for i in imu_cvm_matches}
 cvm_prior = {i[0]: cvm_prior[ i[1] ] for i in imu_cvm_matches}
-# get only the groundtruth contained in both imu and cvm (and the one previous to it!)
+# get only the groundtruth contained in both imu and cvm
 # imu_groundtruth_matches = associate.associate(imu_prior, groundtruth, offset=0.0, max_difference=0.02)
 # groundtruth = {i[0]: groundtruth[ i[0] ] for i in imu_groundtruth_matches}
 
-# to relative
 groundtruth_relative = absoluteToRelative(groundtruth)
 imu_relative = navStateToPose(imu_prior)
 cvm_relative = navStateToPose(cvm_prior)
-# imu_relative = absoluteToRelative(imu_prior)
-# cvm_relative = absoluteToRelative(cvm_prior)
 
 # convert groundtruth to camera frame
 groundtruth_relative = {
     i: np.dot(
-        np.dot(T_cb, groundtruth_relative[i]),
+        np.dot(np.linalg.inv(T_bc), groundtruth_relative[i]),
         T_bc
     )
     for i in groundtruth_relative
@@ -139,63 +95,55 @@ if len(imu_matches) != len(cvm_matches):
     print 'Not exact correspondence between IMU and CVM'
     exit(0)
 
-# get only the groundtruth contained in both imu and cvm
-groundtruth_relative = {i[0]: groundtruth_relative[ i[0] ] for i in imu_matches}
-
 imu_errors = np.zeros( (len(imu_matches), 4) )
 cvm_errors = np.zeros( (len(cvm_matches), 4) )
 
 imu_predictions = np.zeros( (len(imu_matches), 6) )
 cvm_predictions = np.zeros( (len(cvm_matches), 6) )
 groundtruth_predictions = np.zeros( (len(imu_matches), 6) )
-timestamp_at_prediction = np.zeros( (len(imu_matches)) )
 
 for match_idx in range(len(imu_matches)):
     ground_relative_T = groundtruth_relative[imu_matches[match_idx][0]]
     imu_relative_T = imu_relative[imu_matches[match_idx][1]]
     cvm_relative_T = cvm_relative[cvm_matches[match_idx][1]]
 
-
-    # ---------------------------- Errors ---------------------------- #
-    # imu_R_error = np.asarray(rotationMatrixToEulerAngles(imu_relative_T[:3, :3])) - np.asarray(rotationMatrixToEulerAngles(ground_relative_T[:3, :3]))
-    # # imu_R_error = np.dot(imu_relative_T[:3, :3].transpose(), ground_relative_T[:3, :3])
+    imu_R_error = np.asarray(rotmat.rotmat2Euler(imu_relative_T[:3, :3])) - np.asarray(rotmat.rotmat2Euler(ground_relative_T[:3, :3]))
+    # imu_R_error = np.dot(imu_relative_T[:3, :3].transpose(), ground_relative_T[:3, :3])
     
-    # cvm_R_error = np.asarray(rotationMatrixToEulerAngles(cvm_relative_T[:3, :3])) - np.asarray(rotationMatrixToEulerAngles(ground_relative_T[:3, :3]))
-    # # cvm_R_error = np.dot(cvm_relative_T[:3, :3].transpose(), ground_relative_T[:3, :3])
+    cvm_R_error = np.asarray(rotmat.rotmat2Euler(cvm_relative_T[:3, :3])) - np.asarray(rotmat.rotmat2Euler(ground_relative_T[:3, :3]))
+    # cvm_R_error = np.dot(cvm_relative_T[:3, :3].transpose(), ground_relative_T[:3, :3])
     
 
-    # imu_t_error = np.arccos(
-    #     np.dot(ground_relative_T[:3, 3]/np.linalg.norm(ground_relative_T[:3, 3]), imu_relative_T[:3, 3]/np.linalg.norm(imu_relative_T[:3, 3]))
-    # ) * 180 / pi
+    imu_t_error = np.arccos(
+        np.dot(ground_relative_T[:3, 3]/np.linalg.norm(ground_relative_T[:3, 3]), imu_relative_T[:3, 3]/np.linalg.norm(imu_relative_T[:3, 3]))
+    ) * 180 / pi
 
-    # cvm_t_error = np.arccos(
-    #     np.dot(ground_relative_T[:3, 3]/np.linalg.norm(ground_relative_T[:3, 3]), cvm_relative_T[:3, 3]/np.linalg.norm(cvm_relative_T[:3, 3]))
-    # ) * 180 / pi
+    cvm_t_error = np.arccos(
+        np.dot(ground_relative_T[:3, 3]/np.linalg.norm(ground_relative_T[:3, 3]), cvm_relative_T[:3, 3]/np.linalg.norm(cvm_relative_T[:3, 3]))
+    ) * 180 / pi
 
-    # # imu_t_error = ground_relative_T[:3, 3] - imu_relative_T[:3, 3]
-    # # imu_t_error = np.linalg.norm(imu_t_error)
+    # imu_t_error = ground_relative_T[:3, 3] - imu_relative_T[:3, 3]
+    # imu_t_error = np.linalg.norm(imu_t_error)
 
-    # # cvm_t_error = ground_relative_T[:3, 3] - cvm_relative_T[:3, 3]
-    # # cvm_t_error = np.linalg.norm(cvm_t_error)
+    # cvm_t_error = ground_relative_T[:3, 3] - cvm_relative_T[:3, 3]
+    # cvm_t_error = np.linalg.norm(cvm_t_error)
 
-    # imu_errors[match_idx, :3] = imu_R_error
-    # imu_errors[match_idx, 3] = imu_t_error
+    imu_errors[match_idx, :3] = imu_R_error
+    imu_errors[match_idx, 3] = imu_t_error
 
-    # cvm_errors[match_idx, :3] = cvm_R_error
-    # cvm_errors[match_idx, 3] = cvm_t_error
+    cvm_errors[match_idx, :3] = cvm_R_error
+    cvm_errors[match_idx, 3] = cvm_t_error
 
 
-    # ----------------------- Predictions ----------------------------- #
-    imu_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(imu_relative_T[:3, :3])) * 180 / pi
+    # ----------------------- Predictions -----------------------------#
+    imu_predictions[match_idx, :3] = np.asarray(rotmat.rotmat2Euler(imu_relative_T[:3, :3]))
     imu_predictions[match_idx, 3:] = imu_relative_T[:3, 3]/np.linalg.norm(imu_relative_T[:3, 3])
 
-    cvm_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(cvm_relative_T[:3, :3])) * 180 / pi
+    cvm_predictions[match_idx, :3] = np.asarray(rotmat.rotmat2Euler(cvm_relative_T[:3, :3]))
     cvm_predictions[match_idx, 3:] = cvm_relative_T[:3, 3]/np.linalg.norm(cvm_relative_T[:3, 3])
 
-    groundtruth_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(ground_relative_T[:3, :3])) * 180 / pi * 10
+    groundtruth_predictions[match_idx, :3] = np.asarray(rotmat.rotmat2Euler(ground_relative_T[:3, :3]))
     groundtruth_predictions[match_idx, 3:] = ground_relative_T[:3, 3]/np.linalg.norm(ground_relative_T[:3, 3])
-
-    timestamp_at_prediction[match_idx] = imu_matches[match_idx][0]
 
     # print imu_matches[match_idx]
     # print imu_q
@@ -204,56 +152,56 @@ for match_idx in range(len(imu_matches)):
     # print quat.rotmat2quat(cvm_relative_T[:3, :3])
     # print quat.rotmat2quat(ground_relative_T[:3, :3])
     
-    # print rotationMatrixToEulerAngles(imu_relative_T)
-    # print rotationMatrixToEulerAngles(cvm_relative_T)
-    # print rotationMatrixToEulerAngles(ground_relative_T)
+    # print rotmat.rotmat2Euler(imu_relative_T)
+    # print rotmat.rotmat2Euler(cvm_relative_T)
+    # print rotmat.rotmat2Euler(ground_relative_T)
     # exit(0)
 
 plt.subplot(231)
 plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
-plt.plot(timestamp_at_prediction, imu_predictions[:, 0], label='Prediction')
-plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 0], label='Groundtruth')
+plt.plot(range(imu_predictions.shape[0]), imu_predictions[:, 0], label='Prediction')
+plt.plot(range(groundtruth_predictions.shape[0]), groundtruth_predictions[:, 0], label='Groundtruth')
 plt.title('IMU Rotation X prediction')
 plt.legend()
 
 plt.subplot(232)
 plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
-plt.plot(timestamp_at_prediction, imu_predictions[:, 1], label='Prediction')
-plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 1], label='Groundtruth')
+plt.plot(range(imu_predictions.shape[0]), imu_predictions[:, 1], label='Prediction')
+plt.plot(range(groundtruth_predictions.shape[0]), groundtruth_predictions[:, 1], label='Groundtruth')
 plt.title('IMU Rotation Y prediction')
 plt.legend()
 
 plt.subplot(233)
 plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
-plt.plot(timestamp_at_prediction, imu_predictions[:, 2], label='Prediction')
-plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 2], label='Groundtruth')
+plt.plot(range(imu_predictions.shape[0]), imu_predictions[:, 2], label='Prediction')
+plt.plot(range(groundtruth_predictions.shape[0]), groundtruth_predictions[:, 2], label='Groundtruth')
 plt.title('IMU Rotation Z prediction')
 plt.legend()
 
 plt.subplot(234)
 plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
-plt.plot(timestamp_at_prediction, cvm_predictions[:, 0], label='Prediction')
-plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 0], label='Groundtruth')
+plt.plot(range(cvm_predictions.shape[0]), cvm_predictions[:, 0], label='Prediction')
+plt.plot(range(groundtruth_predictions.shape[0]), groundtruth_predictions[:, 0], label='Groundtruth')
 plt.title('CMV Rotation X prediction')
 plt.legend()
 
 plt.subplot(235)
 plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
-plt.plot(timestamp_at_prediction, cvm_predictions[:, 1], label='Prediction')
-plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 1], label='Groundtruth')
+plt.plot(range(cvm_predictions.shape[0]), cvm_predictions[:, 1], label='Prediction')
+plt.plot(range(groundtruth_predictions.shape[0]), groundtruth_predictions[:, 1], label='Groundtruth')
 plt.title('CMV Rotation Y prediction')
 plt.legend()
 
 plt.subplot(236)
 plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
-plt.plot(timestamp_at_prediction, cvm_predictions[:, 2], label='Prediction')
-plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 2], label='Groundtruth')
+plt.plot(range(cvm_predictions.shape[0]), cvm_predictions[:, 2], label='Prediction')
+plt.plot(range(groundtruth_predictions.shape[0]), groundtruth_predictions[:, 2], label='Groundtruth')
 plt.title('CMV Rotation Z prediction')
 plt.legend()
 
@@ -264,48 +212,48 @@ plt.figure()
 plt.subplot(231)
 plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
-plt.plot(timestamp_at_prediction, imu_predictions[:, 3], label='Prediction')
-plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 3], label='Groundtruth')
+plt.plot(range(imu_predictions.shape[0]), imu_predictions[:, 3], label='Prediction')
+plt.plot(range(groundtruth_predictions.shape[0]), groundtruth_predictions[:, 3], label='Groundtruth')
 plt.title('IMU Translation X prediction')
 plt.legend()
 
 plt.subplot(232)
 plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
-plt.plot(timestamp_at_prediction, imu_predictions[:, 4], label='Prediction')
-plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 4], label='Groundtruth')
+plt.plot(range(imu_predictions.shape[0]), imu_predictions[:, 4], label='Prediction')
+plt.plot(range(groundtruth_predictions.shape[0]), groundtruth_predictions[:, 4], label='Groundtruth')
 plt.title('IMU Translation Y prediction')
 plt.legend()
 
 plt.subplot(233)
 plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
-plt.plot(timestamp_at_prediction, imu_predictions[:, 5], label='Prediction')
-plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 5], label='Groundtruth')
+plt.plot(range(imu_predictions.shape[0]), imu_predictions[:, 5], label='Prediction')
+plt.plot(range(groundtruth_predictions.shape[0]), groundtruth_predictions[:, 5], label='Groundtruth')
 plt.title('IMU Translation Z prediction')
 plt.legend()
 
 plt.subplot(234)
 plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
-plt.plot(timestamp_at_prediction, cvm_predictions[:, 3], label='Prediction')
-plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 3], label='Groundtruth')
+plt.plot(range(cvm_predictions.shape[0]), cvm_predictions[:, 3], label='Prediction')
+plt.plot(range(groundtruth_predictions.shape[0]), groundtruth_predictions[:, 3], label='Groundtruth')
 plt.title('CMV Translation X prediction')
 plt.legend()
 
 plt.subplot(235)
 plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
-plt.plot(timestamp_at_prediction, cvm_predictions[:, 4], label='Prediction')
-plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 4], label='Groundtruth')
+plt.plot(range(cvm_predictions.shape[0]), cvm_predictions[:, 4], label='Prediction')
+plt.plot(range(groundtruth_predictions.shape[0]), groundtruth_predictions[:, 4], label='Groundtruth')
 plt.title('CMV Translation Y prediction')
 plt.legend()
 
 plt.subplot(236)
 plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
-plt.plot(timestamp_at_prediction, cvm_predictions[:, 5], label='Prediction')
-plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 5], label='Groundtruth')
+plt.plot(range(cvm_predictions.shape[0]), cvm_predictions[:, 5], label='Prediction')
+plt.plot(range(groundtruth_predictions.shape[0]), groundtruth_predictions[:, 5], label='Groundtruth')
 plt.title('CMV Translation Z prediction')
 plt.legend()
 
@@ -371,44 +319,38 @@ plt.legend()
 # plt.plot(cvm_errors[:, 3], label='CVM error')   
 # plt.legend()
 
-# save
-groundtruth_relative_list = [
-    [
-        imu_matches[match_idx][0], 
-        groundtruth_relative[imu_matches[match_idx][0]][0, 3], 
-        groundtruth_relative[imu_matches[match_idx][0]][1, 3], 
-        groundtruth_relative[imu_matches[match_idx][0]][2, 3]
-    ] +
-    list(
-        # rotationMatrixToEulerAngles(groundtruth_relative[imu_matches[match_idx][0]][:3, :3])
-        # quat.rotmat2quat(groundtruth_relative[imu_matches[match_idx][0]][:3, :3])[0]
-        groundtruth_relative[imu_matches[match_idx][0]][:3, :3].reshape([9])
+# # save
+# groundtruth_relative_list = [
+#     [
+#         imu_matches[match_idx][0], 
+#         groundtruth_relative[imu_matches[match_idx][0]][0, 3], 
+#         groundtruth_relative[imu_matches[match_idx][0]][1, 3], 
+#         groundtruth_relative[imu_matches[match_idx][0]][2, 3]
+#     ] +
+#     list(
+#         rotmat.rotmat2Euler(groundtruth_relative[imu_matches[match_idx][0]][:3, :3])
+#     )
+#     for match_idx in range(len(imu_matches))
+# ]
+# groundtruth_relative_list.sort()
+# groundtruth_relative_list = np.asarray(groundtruth_relative_list)
+# np.savetxt("gt_relative.csv", groundtruth_relative_list, fmt="%.6f")
 
-    )
-    for match_idx in range(len(imu_matches))
-]
-groundtruth_relative_list.sort()
-print groundtruth_relative_list[:5]
-groundtruth_relative_list = np.asarray(groundtruth_relative_list)
-np.savetxt("gt_relative.csv", groundtruth_relative_list, fmt="%.6f")
-
-imu_relative_list = [
-    [
-        imu_matches[match_idx][1], 
-        imu_relative[imu_matches[match_idx][1]][0, 3], 
-        imu_relative[imu_matches[match_idx][1]][1, 3], 
-        imu_relative[imu_matches[match_idx][1]][2, 3]
-    ] +
-    list(
-        # rotationMatrixToEulerAngles(imu_relative[imu_matches[match_idx][0]][:3, :3])
-        # quat.rotmat2quat(groundtruth_relative[imu_matches[match_idx][0]][:3, :3])[0]
-        imu_relative[imu_matches[match_idx][1]][:3, :3].reshape([9])
-    )
-    for match_idx in range(len(imu_matches))
-]
-imu_relative_list.sort()
-imu_relative_list = np.asarray(imu_relative_list)
-np.savetxt("imu_relative.csv", imu_relative_list, fmt="%.6f")
+# imu_relative_list = [
+#     [
+#         imu_matches[match_idx][1], 
+#         imu_relative[imu_matches[match_idx][1]][0, 3], 
+#         imu_relative[imu_matches[match_idx][1]][1, 3], 
+#         imu_relative[imu_matches[match_idx][1]][2, 3]
+#     ] +
+#     list(
+#         rotmat.rotmat2Euler(imu_relative[imu_matches[match_idx][0]][:3, :3])
+#     )
+#     for match_idx in range(len(imu_matches))
+# ]
+# imu_relative_list.sort()
+# imu_relative_list = np.asarray(imu_relative_list)
+# np.savetxt("imu_relative.csv", imu_relative_list, fmt="%.6f")
 
 # cvm_relative_list = [
 #     [
@@ -418,7 +360,7 @@ np.savetxt("imu_relative.csv", imu_relative_list, fmt="%.6f")
 #         cvm_relative[cvm_matches[match_idx][1]][2, 3]
 #     ] +
 #     list(
-#         rotationMatrixToEulerAngles(cvm_relative[cvm_matches[match_idx][0]][:3, :3])
+#         rotmat.rotmat2Euler(cvm_relative[cvm_matches[match_idx][0]][:3, :3])
 #     )
 #     for match_idx in range(len(cvm_matches))
 # ]
