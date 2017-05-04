@@ -3,7 +3,6 @@
 import sys
 import numpy as np
 from skinematics import quat, rotmat
-import transforms3d
 import associate
 import math
 from math import pi, sqrt
@@ -186,13 +185,15 @@ for match_idx in range(len(imu_matches)):
 
 
     # ----------------------- Predictions ----------------------------- #
-    imu_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(imu_relative_T[:3, :3])) * 180 / pi
+    # imu_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(imu_relative_T[:3, :3])) * 180 / pi
+    imu_predictions[match_idx, :3] = np.asarray(imu_prior[imu_matches[match_idx][1]][3:6])/2.0 * 180 / pi
     imu_predictions[match_idx, 3:] = imu_relative_T[:3, 3]/np.linalg.norm(imu_relative_T[:3, 3])
 
-    cvm_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(cvm_relative_T[:3, :3])) * 180 / pi
+    # cvm_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(cvm_relative_T[:3, :3])) * 180 / pi
+    cvm_predictions[match_idx, :3] = np.asarray(cvm_prior[cvm_matches[match_idx][1]][3:6])/2.0 * 180 / pi
     cvm_predictions[match_idx, 3:] = cvm_relative_T[:3, 3]/np.linalg.norm(cvm_relative_T[:3, 3])
 
-    groundtruth_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(ground_relative_T[:3, :3])) * 180 / pi * 10
+    groundtruth_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(ground_relative_T[:3, :3])) * 180 / pi
     groundtruth_predictions[match_idx, 3:] = ground_relative_T[:3, 3]/np.linalg.norm(ground_relative_T[:3, 3])
 
     timestamp_at_prediction[match_idx] = imu_matches[match_idx][0]
