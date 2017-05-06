@@ -90,6 +90,7 @@ def associate(first_list, second_list,offset,max_difference):
                          for b in second_keys 
                          if abs(a - (b + offset)) < max_difference]
     potential_matches.sort()
+    #print potential_matches
     matches = []
     for diff, a, b in potential_matches:
         if a in first_keys and b in second_keys:

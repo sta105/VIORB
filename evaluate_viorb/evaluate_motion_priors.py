@@ -66,25 +66,41 @@ def navStateToPose(nav_states):
     nav_states_list = [(i, np.eye(4)) for i in nav_states]
     nav_states_list.sort()
 
+    nav_state_reference_timestamps = [(i, None) for i in nav_states]
+
     for i in range(len(nav_states_list)):
-        p = nav_states[nav_states_list[i][0]][0:3]
-        q = nav_states[nav_states_list[i][0]][3:7]
+        t2 = nav_states_list[i][0]
+        p2 = nav_states[nav_states_list[i][0]][0:3]
+        q2 = nav_states[nav_states_list[i][0]][3:7]
         # convention of ORB-SLAM is x, y, z, w: but we need w, x, y, z for skinematics
-        q = np.asarray([q[3], q[0], q[1], q[2]])
-        T = toPose(p, q)
+        q2 = np.asarray([q2[3], q2[0], q2[1], q2[2]])
+        T2 = toPose(p2, q2)
 
-        nav_states_list[i] = (nav_states_list[i][0], T)
+        t1 = nav_states[nav_states_list[i][0]][7]
+        p1 = nav_states[nav_states_list[i][0]][8:11]
+        q1 = nav_states[nav_states_list[i][0]][11:15]
+        # convention of ORB-SLAM is x, y, z, w: but we need w, x, y, z for skinematics
+        q1 = np.asarray([q1[3], q1[0], q1[1], q1[2]])
+        T1 = toPose(p1, q1)
 
-    return dict(nav_states_list)
+        relative_T = np.dot(T2, T1)
+        # relative_T = np.eye(4)
+        # relative_T[:3, :3] = np.dot(T2[:3, :3].transpose(), T1[:3, :3])
+        # relative_T[:3, 3] = np.dot(T2[:3, :3].transpose(), T1[:3, 3] - T2[:3, 3])
+        nav_states_list[i] = (t2, relative_T)
+        nav_state_reference_timestamps[i] = (t2, t1)
+
+        
+    return dict(nav_states_list), dict(nav_state_reference_timestamps)
 
 # compute the relative pose
 def absoluteToRelative(absolute):
     relative = [(i, np.eye(4)) for i in absolute]
     relative.sort()
 
-    for i in range(1, len(relative)):
-        p1 = absolute[relative[i-1][0]][0:3]
-        q1 = absolute[relative[i-1][0]][3:7]
+    for i in range(10, len(relative)):
+        p1 = absolute[relative[i-10][0]][0:3]
+        q1 = absolute[relative[i-10][0]][3:7]
         T1 = toPose(p1, q1)
 
         p2 = absolute[relative[i][0]][0:3]
@@ -99,6 +115,42 @@ def absoluteToRelative(absolute):
 
     return dict(relative)
 
+def parseGroundtruth(nav_states):
+    nav_states_list = [(i, np.eye(4)) for i in nav_states]
+    nav_states_list.sort()
+
+    for i in range(len(nav_states_list)):
+        t = nav_states_list[i][0]
+        p = nav_states[nav_states_list[i][0]][0:3]
+        q = nav_states[nav_states_list[i][0]][3:7]
+        q = np.asarray(q)
+        T = toPose(p, q)
+
+        nav_states_list[i] = (t, T)
+
+    return dict(nav_states_list)
+
+def findRelativeGroundtruth(relative_pose_dict, reference_timestamp, groundtruth_poses, matches):
+    relative_ground_truth = []
+    # convert from list of tuples to dict (first element is ground truth timestamp, but we want the relative pose timestamp to be the key)
+    matches_dict = dict([(i[1], i[0]) for i in matches])
+
+    for pose_t2 in relative_pose_dict:
+        groundtruth_T2 = groundtruth_poses[matches_dict[pose_t2]]
+
+        pose_t1 = reference_timestamp[pose_t2]
+        groundtruth_T1 = groundtruth_poses[matches_dict[pose_t1]]
+
+        relative_T = np.dot(np.linalg.inv(groundtruth_T2), groundtruth_T1)
+        # convert groundtruth to camera frame
+        relative_T = np.dot(
+            np.dot(T_cb, relative_T),
+            T_bc
+        )
+        relative_ground_truth.append( (matches_dict[pose_t2], relative_T) )
+
+    return dict(relative_ground_truth)
+
 groundtruth_file = sys.argv[1]
 imu_file = sys.argv[2]
 cmv_file = sys.argv[3]
@@ -107,8 +159,11 @@ groundtruth = associate.read_file_list(groundtruth_file, timestamp_scale=1e-9)
 imu_prior = associate.read_file_list(imu_file)
 cvm_prior = associate.read_file_list(cmv_file)
 
+# convert from list to pose dictionary
+groundtruth_poses = parseGroundtruth(groundtruth)
+
 # get only the ones contained in both imu and cvm
-imu_cvm_matches = associate.associate(imu_prior, cvm_prior, offset=0.0, max_difference=0.02)
+imu_cvm_matches = associate.associate(imu_prior, cvm_prior, offset=0.0, max_difference=0.005)
 imu_prior = {i[0]: imu_prior[ i[0] ] for i in imu_cvm_matches}
 cvm_prior = {i[0]: cvm_prior[ i[1] ] for i in imu_cvm_matches}
 # get only the groundtruth contained in both imu and cvm (and the one previous to it!)
@@ -116,33 +171,33 @@ cvm_prior = {i[0]: cvm_prior[ i[1] ] for i in imu_cvm_matches}
 # groundtruth = {i[0]: groundtruth[ i[0] ] for i in imu_groundtruth_matches}
 
 # to relative
-groundtruth_relative = absoluteToRelative(groundtruth)
-imu_relative = navStateToPose(imu_prior)
-cvm_relative = navStateToPose(cvm_prior)
-# imu_relative = absoluteToRelative(imu_prior)
-# cvm_relative = absoluteToRelative(cvm_prior)
+# groundtruth_relative = absoluteToRelative(groundtruth)
 
-# convert groundtruth to camera frame
-groundtruth_relative = {
-    i: np.dot(
-        np.dot(T_cb, groundtruth_relative[i]),
-        T_bc
-    )
-    for i in groundtruth_relative
-}
+# --------------------------------------- relative poses of imu --------------------------------------- #
+imu_relative, imu_reference_timestamps = navStateToPose(imu_prior)
+required_timestamps = imu_reference_timestamps.keys() + imu_reference_timestamps.values()
+# the associate function required dict
+imu_matches = associate.associate(groundtruth_poses, {i:None for i in required_timestamps}, offset=0.0, max_difference=0.005)
+imu_groundtruth_relative = findRelativeGroundtruth(imu_relative, imu_reference_timestamps, groundtruth_poses, imu_matches)
 
-imu_matches = associate.associate(groundtruth_relative, imu_relative, offset=0.0, max_difference=0.02)
-cvm_matches = associate.associate(groundtruth_relative, cvm_relative, offset=0.0, max_difference=0.02)
+# --------------------------------------- relative poses of cvm --------------------------------------- #
+cvm_relative, cvm_reference_timestamps = navStateToPose(cvm_prior)
+required_timestamps = cvm_reference_timestamps.keys() + cvm_reference_timestamps.values()
+# the associate function required dict
+cvm_matches = associate.associate(groundtruth_poses, {i:None for i in required_timestamps}, offset=0.0, max_difference=0.005)
+cvm_relative_groundtruth = findRelativeGroundtruth(cvm_relative, cvm_reference_timestamps, groundtruth_poses, cvm_matches)
+
 
 if len(imu_matches) != len(cvm_matches):
     print 'Not exact correspondence between IMU and CVM'
     exit(0)
 
-# get only the groundtruth contained in both imu and cvm
-groundtruth_relative = {i[0]: groundtruth_relative[ i[0] ] for i in imu_matches}
+groundtruth_relative = imu_groundtruth_relative
+imu_matches = associate.associate(groundtruth_relative, imu_relative, offset=0.0, max_difference=0.005)
+cvm_matches = associate.associate(groundtruth_relative, cvm_relative, offset=0.0, max_difference=0.005)
 
-imu_errors = np.zeros( (len(imu_matches), 4) )
-cvm_errors = np.zeros( (len(cvm_matches), 4) )
+#imu_errors = np.zeros( (len(imu_matches), 4) )
+#cvm_errors = np.zeros( (len(cvm_matches), 4) )
 
 imu_predictions = np.zeros( (len(imu_matches), 6) )
 cvm_predictions = np.zeros( (len(cvm_matches), 6) )
@@ -185,15 +240,16 @@ for match_idx in range(len(imu_matches)):
 
 
     # ----------------------- Predictions ----------------------------- #
-    # imu_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(imu_relative_T[:3, :3])) * 180 / pi
-    imu_predictions[match_idx, :3] = np.asarray(imu_prior[imu_matches[match_idx][1]][3:6])/2.0 * 180 / pi
+    imu_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(imu_relative_T[:3, :3])) * 180 / pi
+    # imu_predictions[match_idx, :3] = np.asarray(imu_prior[imu_matches[match_idx][1]][3:6])/2.0 * 180 / pi
     imu_predictions[match_idx, 3:] = imu_relative_T[:3, 3]/np.linalg.norm(imu_relative_T[:3, 3])
 
-    # cvm_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(cvm_relative_T[:3, :3])) * 180 / pi
-    cvm_predictions[match_idx, :3] = np.asarray(cvm_prior[cvm_matches[match_idx][1]][3:6])/2.0 * 180 / pi
+    cvm_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(cvm_relative_T[:3, :3])) * 180 / pi
+    # cvm_predictions[match_idx, :3] = np.asarray(cvm_prior[cvm_matches[match_idx][1]][3:6])/2.0 * 180 / pi
     cvm_predictions[match_idx, 3:] = cvm_relative_T[:3, 3]/np.linalg.norm(cvm_relative_T[:3, 3])
 
     groundtruth_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(ground_relative_T[:3, :3])) * 180 / pi
+    # groundtruth_predictions[match_idx, :3] = np.asarray(groundtruth[imu_matches[match_idx][0]][4:7])/2.0 * 180 / pi
     groundtruth_predictions[match_idx, 3:] = ground_relative_T[:3, 3]/np.linalg.norm(ground_relative_T[:3, 3])
 
     timestamp_at_prediction[match_idx] = imu_matches[match_idx][0]
@@ -239,7 +295,7 @@ plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
 plt.plot(timestamp_at_prediction, cvm_predictions[:, 0], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 0], label='Groundtruth')
-plt.title('CMV Rotation X prediction')
+plt.title('CVM Rotation X prediction')
 plt.legend()
 
 plt.subplot(235)
@@ -247,7 +303,7 @@ plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
 plt.plot(timestamp_at_prediction, cvm_predictions[:, 1], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 1], label='Groundtruth')
-plt.title('CMV Rotation Y prediction')
+plt.title('CVM Rotation Y prediction')
 plt.legend()
 
 plt.subplot(236)
@@ -255,7 +311,7 @@ plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
 plt.plot(timestamp_at_prediction, cvm_predictions[:, 2], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 2], label='Groundtruth')
-plt.title('CMV Rotation Z prediction')
+plt.title('CVM Rotation Z prediction')
 plt.legend()
 
 ######################################### Translation #########################################
@@ -291,7 +347,7 @@ plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
 plt.plot(timestamp_at_prediction, cvm_predictions[:, 3], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 3], label='Groundtruth')
-plt.title('CMV Translation X prediction')
+plt.title('CVM Translation X prediction')
 plt.legend()
 
 plt.subplot(235)
@@ -299,7 +355,7 @@ plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
 plt.plot(timestamp_at_prediction, cvm_predictions[:, 4], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 4], label='Groundtruth')
-plt.title('CMV Translation Y prediction')
+plt.title('CVM Translation Y prediction')
 plt.legend()
 
 plt.subplot(236)
@@ -307,7 +363,7 @@ plt.xlabel('Frame ID')
 plt.ylabel('Prediction (degrees)')
 plt.plot(timestamp_at_prediction, cvm_predictions[:, 5], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 5], label='Groundtruth')
-plt.title('CMV Translation Z prediction')
+plt.title('CVM Translation Z prediction')
 plt.legend()
 
 

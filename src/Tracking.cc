@@ -265,13 +265,13 @@ bool Tracking::TrackLocalMapWithIMU(bool bMapUpdated)
         if(mCurrentFrame.GetNavState().Get_dBias_Gyr().norm() > 1e-6) cerr<<"TrackLocalMapWithIMU current Frame dBias gyr not zero"<<endl;
 
         //debug
-        //saveDebugStates("../../../tmp/IMUpredic_beforetracklm.txt","../../../tmp/IMUpredict_beforetracklm.txt");
+        //saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_beforetracklm.txt");
 
 
-        Optimizer::PoseOptimization(&mCurrentFrame,mpLastKeyFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
+        //Optimizer::PoseOptimization(&mCurrentFrame,mpLastKeyFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
 
 
-        //saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_aftertracklm.txt");
+        ///saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_aftertracklm.txt");
         //Optimizer::PoseOptimization15DoF(&mCurrentFrame,mpLastKeyFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
 
         //Optimizer::PoseOptimization(&mCurrentFrame,pMapUpdateKF,imupreint,mpLocalMapper->GetGravityVec(),true);
@@ -970,6 +970,7 @@ void Tracking::Track()
             // Add Frames to re-compute IMU bias after reloc
             if(mbRelocBiasPrepare)
             {
+                cout<<"call re-computing bias function here"<<endl;
                 mv20FramesReloc.push_back(mCurrentFrame);
 
                 // Before creating new keyframe
@@ -2285,8 +2286,7 @@ void Tracking::saveDebugStates(const string &IMUfilename,const string &CVMfilena
 
         mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0,3).col(3));
 
-        cv::Mat predictedRelativePose = mCurrentFrame.mTcw*LastTwc;
-
+        // cv::Mat predictedRelativePose = mCurrentFrame.mTcw;//*LastTwc;
 
         //Eigen::Matrix3d predictedR;
          // predictedR <<   predictedRelativePose.at<float>(0, 0), predictedRelativePose.at<float>(0, 1), predictedRelativePose.at<float>(0, 2), 
@@ -2294,16 +2294,28 @@ void Tracking::saveDebugStates(const string &IMUfilename,const string &CVMfilena
          //                 predictedRelativePose.at<float>(2, 0), predictedRelativePose.at<float>(2, 1), predictedRelativePose.at<float>(2, 2);
 
         cv::Mat R;// = cv::Mat::eye(3,3,CV_32F);
+        cv::Mat lastR;
+
+        R= mCurrentFrame.mTcw.rowRange(0,3).colRange(0,3).clone();
+        lastR=LastTwc.rowRange(0,3).colRange(0,3).clone();
 
         //predictedRelativePose.clone().copyTo(R.rowRange(0,3).colRange(0,3));
-        R=predictedRelativePose.rowRange(0,3).colRange(0,3).clone();
-
+        
         vector<float> q = Converter::toQuaternion(R);
+        vector<float> lastq = Converter::toQuaternion(lastR);
+        // SO3 so3(Converter::toMatrix3d(R));
+        // Eigen::Quaterniond q = so3.unit_quaternion();
 
         //SO3 so3(predictedR);
         f << setprecision(6) << mCurrentFrame.mTimeStamp << setprecision(7) << " ";
-        f << predictedRelativePose.at<float>(0, 3) << " " << predictedRelativePose.at<float>(1, 3) << " " << predictedRelativePose.at<float>(2, 3) << " ";
-        f << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << endl;
+        f << mCurrentFrame.mTcw.at<float>(0, 3) << " " << mCurrentFrame.mTcw.at<float>(1, 3) << " " << mCurrentFrame.mTcw.at<float>(2, 3) << " ";
+        f << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " ";
+        // previous frame
+        f << setprecision(6) << mLastFrame.mTimeStamp << setprecision(7) << " ";
+        f << LastTwc.at<float>(0, 3) << " " << LastTwc.at<float>(1, 3) << " " << LastTwc.at<float>(2, 3) << " ";
+        f << lastq[0] << " " << lastq[1] << " " << lastq[2] << " " << lastq[3];
+        f << endl;
+        //f << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << endl;
         f.close();  
 
 
