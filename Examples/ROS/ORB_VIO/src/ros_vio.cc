@@ -43,7 +43,7 @@
 #include "ORB_VIO/viorb_msg.h"
 #include "../../../include/Converter.h"
 
-#undef RUN_REALTIME
+//#undef RUN_REALTIME
 
 using namespace std;
 

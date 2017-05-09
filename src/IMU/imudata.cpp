@@ -33,8 +33,8 @@ double IMUData::_accBiasRw2 = 5e-3*5e-3;//4.5e-8*1e3;//3e-3*3e-3*0.005*1e4;  //4
 
 //Matrix3d IMUData::_gyrMeasCov = Matrix3d::Identity()*5e-4*5e-4*200*1e2;       // sigma_g * sigma_g / dt, ~5e-5*
 //Matrix3d IMUData::_accMeasCov = Matrix3d::Identity()*8e-4*8e-4*200*1e2;       // sigma_a * sigma_a / dt, ~1.28e-4*
-Matrix3d IMUData::_gyrMeasCov = Matrix3d::Identity()*8e-3*8e-3*200*100;//2.5e-5*1e2;       // sigma_g * sigma_g / dt, ~5e-5*
-Matrix3d IMUData::_accMeasCov = Matrix3d::Identity()*8e-3*8e-3*200*100;//2.5e-4*1e3;       // sigma_a * sigma_a / dt, ~1.28e-4*
+Matrix3d IMUData::_gyrMeasCov = Matrix3d::Identity()*2.0e-3*2.0e-3*200;//*8e-3*8e-3*200*100;//8e-3*8e-3*200*100;//2.5e-5*1e2;       // sigma_g * sigma_g / dt, ~5e-5*
+Matrix3d IMUData::_accMeasCov = Matrix3d::Identity()*8.0e-3*8.0e-3*200; //8e-3*8e-3*200*100;//8e-3*8e-3*200*100;//2.5e-4*1e3;       // sigma_a * sigma_a / dt, ~1.28e-4*
 
 // covariance of bias random walk
 Matrix3d IMUData::_gyrBiasRWCov = Matrix3d::Identity()*_gyrBiasRw2;     // sigma_gw * sigma_gw * dt, ~2e-12

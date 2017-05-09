@@ -268,10 +268,10 @@ bool Tracking::TrackLocalMapWithIMU(bool bMapUpdated)
         //saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_beforetracklm.txt");
 
 
-        //Optimizer::PoseOptimization(&mCurrentFrame,mpLastKeyFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
+        Optimizer::PoseOptimization(&mCurrentFrame,mpLastKeyFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
 
-
-        ///saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_aftertracklm.txt");
+        mbIsKeyframeTracked = true;
+        saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_aftertracklm.txt");
         //Optimizer::PoseOptimization15DoF(&mCurrentFrame,mpLastKeyFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
 
         //Optimizer::PoseOptimization(&mCurrentFrame,pMapUpdateKF,imupreint,mpLocalMapper->GetGravityVec(),true);
@@ -291,7 +291,8 @@ bool Tracking::TrackLocalMapWithIMU(bool bMapUpdated)
 
         Optimizer::PoseOptimization(&mCurrentFrame,&mLastFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
 
-        //saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_aftertracklm.txt");
+        mbIsKeyframeTracked = false;
+        saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_aftertracklm.txt");
         //Optimizer::PoseOptimization15DoF(&mCurrentFrame,&mLastFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
     }
 
@@ -341,7 +342,9 @@ void Tracking::PredictNavStateByIMU(bool bMapUpdated)
     if(mpLocalMapper->GetFirstVINSInited() || bMapUpdated)
     {
         if(mpLocalMapper->GetFirstVINSInited() && !bMapUpdated) cerr<<"2-FirstVinsInit, but not bMapUpdated. shouldn't"<<endl;
-
+        cout<<"tracking last kf"<<endl;
+        saveIMUDataPerImage(true);
+        mbIsKeyframeTracked = true;
         // Compute IMU Pre-integration
         mIMUPreIntInTrack = GetIMUPreIntSinceLastKF(&mCurrentFrame, mpLastKeyFrame, mvIMUSinceLastKF);
 //        {
@@ -378,6 +381,9 @@ void Tracking::PredictNavStateByIMU(bool bMapUpdated)
     // Map not updated, optimize with last Frame
     else
     {
+        saveIMUDataPerImage(false);
+        mbIsKeyframeTracked = false;
+
         // Compute IMU Pre-integration
         mIMUPreIntInTrack = GetIMUPreIntSinceLastFrame(&mCurrentFrame, &mLastFrame);
 
@@ -439,11 +445,19 @@ bool Tracking::TrackWithIMU(bool bMapUpdated)
 //            cerr<<"3 need to modify this part. LastKF in Tracking maybe not UpdateKF in Localmapping? lastKF id:"<<mpLastKeyFrame->mnId<<", MapUpdateKF id:"<<pMapUpdateKF->mnId<<endl;
         //Optimizer::PoseOptimization(&mCurrentFrame,pMapUpdateKF,mIMUPreIntInTrack,mpLocalMapper->GetGravityVec(),false);
         //Optimizer::PoseOptimization15DoF(&mCurrentFrame,pMapUpdateKF,mIMUPreIntInTrack,mpLocalMapper->GetGravityVec(),false);
+
+        mbIsKeyframeTracked = true;
+        saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_aftertrackkf.txt","../../../tmp/IMUpredict_aftertracklm.txt");
+        
     }
     else
     {
         Optimizer::PoseOptimization(&mCurrentFrame,&mLastFrame,mIMUPreIntInTrack,mpLocalMapper->GetGravityVec(),false);
         //Optimizer::PoseOptimization15DoF(&mCurrentFrame,&mLastFrame,mIMUPreIntInTrack,mpLocalMapper->GetGravityVec(),false);
+
+        mbIsKeyframeTracked = false;
+        saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_aftertrackkf.txt","../../../tmp/IMUpredict_aftertracklm.txt");
+        
     }
 
     // debug
@@ -895,8 +909,8 @@ void Tracking::Track()
                     else
                     {
                         bOK = TrackWithIMU(bMapUpdated);
-                        if(!bOK)
-                            bOK = TrackReferenceKeyFrame();
+                        //if(!bOK)
+                            //bOK = TrackReferenceKeyFrame();
 
                     }
                 }
@@ -1586,7 +1600,7 @@ bool Tracking::TrackLocalMap()
 
     // Decide if the tracking was succesful
     // More restrictive if there was a relocalization recently
-    if(mCurrentFrame.mnId<mnLastRelocFrameId+mMaxFrames && mnMatchesInliers<50)
+    if(mCurrentFrame.mnId<mnLastRelocFrameId+mMaxFrames && mnMatchesInliers<30)
         return false;
 
     if(mnMatchesInliers<30)
@@ -2282,16 +2296,18 @@ void Tracking::saveDebugStates(const string &IMUfilename,const string &CVMfilena
 
         cv::Mat LastTwc = cv::Mat::eye(4,4,CV_32F);
 
-        mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0,3).colRange(0,3));
-
-        mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0,3).col(3));
-
-        // cv::Mat predictedRelativePose = mCurrentFrame.mTcw;//*LastTwc;
-
-        //Eigen::Matrix3d predictedR;
-         // predictedR <<   predictedRelativePose.at<float>(0, 0), predictedRelativePose.at<float>(0, 1), predictedRelativePose.at<float>(0, 2), 
-         //                 predictedRelativePose.at<float>(1, 0), predictedRelativePose.at<float>(1, 1), predictedRelativePose.at<float>(1, 2), 
-         //                 predictedRelativePose.at<float>(2, 0), predictedRelativePose.at<float>(2, 1), predictedRelativePose.at<float>(2, 2);
+        double last_timestamp;
+        if (mbIsKeyframeTracked)
+        {
+            LastTwc = mpLastKeyFrame->GetPoseInverse();
+            last_timestamp = mpLastKeyFrame->mTimeStamp;
+        }
+        else
+        {
+            mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0,3).colRange(0,3));
+            mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0,3).col(3));
+            last_timestamp = mLastFrame.mTimeStamp;
+        }
 
         cv::Mat R;// = cv::Mat::eye(3,3,CV_32F);
         cv::Mat lastR;
@@ -2311,12 +2327,12 @@ void Tracking::saveDebugStates(const string &IMUfilename,const string &CVMfilena
         f << mCurrentFrame.mTcw.at<float>(0, 3) << " " << mCurrentFrame.mTcw.at<float>(1, 3) << " " << mCurrentFrame.mTcw.at<float>(2, 3) << " ";
         f << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " ";
         // previous frame
-        f << setprecision(6) << mLastFrame.mTimeStamp << setprecision(7) << " ";
+        f << setprecision(6) << last_timestamp << setprecision(7) << " ";
         f << LastTwc.at<float>(0, 3) << " " << LastTwc.at<float>(1, 3) << " " << LastTwc.at<float>(2, 3) << " ";
         f << lastq[0] << " " << lastq[1] << " " << lastq[2] << " " << lastq[3];
         f << endl;
         //f << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << endl;
-        f.close();  
+f.close(); 
 
 
     }
@@ -2351,6 +2367,59 @@ void Tracking::saveDebugStates(const string &IMUfilename,const string &CVMfilena
     }
 
     mIsFirstDebug = false;
+
+}
+
+void Tracking::saveIMUDataPerImage(bool isKeyframe)
+{
+    static bool isFirst = true;
+    // abbreviation
+    // CVM: constant velocity model
+
+    // save the state predicted by IMU
+    ofstream f;
+    char filename[] = "../../../tmp/IMUcount.txt";
+    
+    if (mpLocalMapper->GetVINSInited())
+    {
+        if (isFirst)
+        {
+            f.open(filename, std::ios_base::out);
+        }
+        else
+        {
+            f.open(filename, std::ios_base::app);
+        }
+
+        // Different operation, according to whether the map is updated
+        if (isKeyframe)
+        {
+            // the prediction was done based on keyframe
+            f << fixed;
+
+            f << setprecision(6) << mCurrentFrame.mTimeStamp << setprecision(7) << " ";
+            f << mvIMUSinceLastKF.size() << " ";
+            f << setprecision(6) << mpLastKeyFrame->mTimeStamp << setprecision(7) << " ";
+            f << 0 << " ";
+            f << endl;
+            f.close();  
+        }
+        else 
+        {
+            // the prediction was done based on last frame
+            f << fixed;
+
+            f << setprecision(6) << mCurrentFrame.mTimeStamp << setprecision(7) << " ";
+            f << mCurrentFrame.mvIMUDataSinceLastFrame.size() << " ";
+            f << setprecision(6) << mLastFrame.mTimeStamp << setprecision(7) << " ";
+            f << 1 << " ";
+            f << endl;
+            f.close();  
+        }
+
+    }
+
+    isFirst = false;
 
 }
 

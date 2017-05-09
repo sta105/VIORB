@@ -248,10 +248,12 @@ protected:
 // added by Rakesh and Sicong
 protected:
     bool mIsFirstDebug;
+    bool mbIsKeyframeTracked;
 public:
     bool GetVINSInited();
     cv::Mat GetGravityVec();
     void saveDebugStates(const string &IMUfilename, const string &CVMfilename);
+    void saveIMUDataPerImage(bool isKeyFrame);
 
 };
 

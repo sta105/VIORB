@@ -1746,7 +1746,7 @@ void LocalMapping::KeyFrameCulling()
         if(pKF->GetNextKeyFrame() == mpCurrentKeyFrame)
             continue;
 
-        if(pKF->mTimeStamp >= mpCurrentKeyFrame->mTimeStamp - 0.11)
+        if(pKF->mTimeStamp >= mpCurrentKeyFrame->mTimeStamp - 0.2)
             continue;
 
 //        // Check time between Prev/Next Keyframe, if larger than 0.5s(for local)/3s(others), don't cull
