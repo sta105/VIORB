@@ -163,7 +163,7 @@ cvm_prior = associate.read_file_list(cmv_file)
 groundtruth_poses = parseGroundtruth(groundtruth)
 
 # get only the ones contained in both imu and cvm
-imu_cvm_matches = associate.associate(imu_prior, cvm_prior, offset=0.0, max_difference=0.005)
+imu_cvm_matches = associate.associate(imu_prior, cvm_prior, offset=0.0, max_difference=0.007)
 imu_prior = {i[0]: imu_prior[ i[0] ] for i in imu_cvm_matches}
 cvm_prior = {i[0]: cvm_prior[ i[1] ] for i in imu_cvm_matches}
 # get only the groundtruth contained in both imu and cvm (and the one previous to it!)
@@ -177,24 +177,29 @@ cvm_prior = {i[0]: cvm_prior[ i[1] ] for i in imu_cvm_matches}
 imu_relative, imu_reference_timestamps = navStateToPose(imu_prior)
 required_timestamps = imu_reference_timestamps.keys() + imu_reference_timestamps.values()
 # the associate function required dict
-imu_matches = associate.associate(groundtruth_poses, {i:None for i in required_timestamps}, offset=0.0, max_difference=0.005)
+imu_matches = associate.associate(groundtruth_poses, {i:None for i in required_timestamps}, offset=0.0, max_difference=0.007)
 imu_groundtruth_relative = findRelativeGroundtruth(imu_relative, imu_reference_timestamps, groundtruth_poses, imu_matches)
 
 # --------------------------------------- relative poses of cvm --------------------------------------- #
 cvm_relative, cvm_reference_timestamps = navStateToPose(cvm_prior)
 required_timestamps = cvm_reference_timestamps.keys() + cvm_reference_timestamps.values()
 # the associate function required dict
-cvm_matches = associate.associate(groundtruth_poses, {i:None for i in required_timestamps}, offset=0.0, max_difference=0.005)
+cvm_matches = associate.associate(groundtruth_poses, {i:None for i in required_timestamps}, offset=0.0, max_difference=0.007)
 cvm_relative_groundtruth = findRelativeGroundtruth(cvm_relative, cvm_reference_timestamps, groundtruth_poses, cvm_matches)
 
+# get only the ones contained in both imu and cvm
+imu_cvm_matches = associate.associate(imu_relative, cvm_relative, offset=0.0, max_difference=0.005)
+imu_relative = {i[0]: imu_relative[ i[0] ] for i in imu_cvm_matches}
+cvm_relative = {i[0]: cvm_relative[ i[1] ] for i in imu_cvm_matches}
+
+groundtruth_relative = imu_groundtruth_relative
+imu_matches = associate.associate(groundtruth_relative, imu_relative, offset=0.0, max_difference=0.005)
+cvm_matches = associate.associate(groundtruth_relative, cvm_relative, offset=0.0, max_difference=0.005)
 
 if len(imu_matches) != len(cvm_matches):
     print 'Not exact correspondence between IMU and CVM'
     exit(0)
 
-groundtruth_relative = imu_groundtruth_relative
-imu_matches = associate.associate(groundtruth_relative, imu_relative, offset=0.0, max_difference=0.005)
-cvm_matches = associate.associate(groundtruth_relative, cvm_relative, offset=0.0, max_difference=0.005)
 
 #imu_errors = np.zeros( (len(imu_matches), 4) )
 #cvm_errors = np.zeros( (len(cvm_matches), 4) )
@@ -238,19 +243,22 @@ for match_idx in range(len(imu_matches)):
     # cvm_errors[match_idx, :3] = cvm_R_error
     # cvm_errors[match_idx, 3] = cvm_t_error
 
+    imu_dt = imu_reference_timestamps[imu_matches[match_idx][1]] - imu_matches[match_idx][1]
+    cvm_dt = cvm_reference_timestamps[cvm_matches[match_idx][1]] - cvm_matches[match_idx][1]
 
     # ----------------------- Predictions ----------------------------- #
-    imu_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(imu_relative_T[:3, :3])) * 180 / pi
+    imu_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(imu_relative_T[:3, :3])) * (180 / pi) / imu_dt
     # imu_predictions[match_idx, :3] = np.asarray(imu_prior[imu_matches[match_idx][1]][3:6])/2.0 * 180 / pi
-    imu_predictions[match_idx, 3:] = imu_relative_T[:3, 3]/np.linalg.norm(imu_relative_T[:3, 3])
+    imu_predictions[match_idx, 3:] = imu_relative_T[:3, 3]/np.linalg.norm(imu_relative_T[:3, 3]) / imu_dt
 
-    cvm_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(cvm_relative_T[:3, :3])) * 180 / pi
+    cvm_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(cvm_relative_T[:3, :3])) * (180 / pi) / cvm_dt
     # cvm_predictions[match_idx, :3] = np.asarray(cvm_prior[cvm_matches[match_idx][1]][3:6])/2.0 * 180 / pi
-    cvm_predictions[match_idx, 3:] = cvm_relative_T[:3, 3]/np.linalg.norm(cvm_relative_T[:3, 3])
+    cvm_predictions[match_idx, 3:] = cvm_relative_T[:3, 3]/np.linalg.norm(cvm_relative_T[:3, 3]) / cvm_dt
 
-    groundtruth_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(ground_relative_T[:3, :3])) * 180 / pi
+    # the groundtruth time interval is with respect to imu
+    groundtruth_predictions[match_idx, :3] = np.asarray(rotationMatrixToEulerAngles(ground_relative_T[:3, :3])) * (180 / pi) / imu_dt
     # groundtruth_predictions[match_idx, :3] = np.asarray(groundtruth[imu_matches[match_idx][0]][4:7])/2.0 * 180 / pi
-    groundtruth_predictions[match_idx, 3:] = ground_relative_T[:3, 3]/np.linalg.norm(ground_relative_T[:3, 3])
+    groundtruth_predictions[match_idx, 3:] = ground_relative_T[:3, 3]/np.linalg.norm(ground_relative_T[:3, 3]) / imu_dt
 
     timestamp_at_prediction[match_idx] = imu_matches[match_idx][0]
 
@@ -268,7 +276,7 @@ for match_idx in range(len(imu_matches)):
 
 plt.subplot(231)
 plt.xlabel('Frame ID')
-plt.ylabel('Prediction (degrees)')
+plt.ylabel('Prediction (degrees/sec)')
 plt.plot(timestamp_at_prediction, imu_predictions[:, 0], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 0], label='Groundtruth')
 plt.title('IMU Rotation X prediction')
@@ -276,7 +284,7 @@ plt.legend()
 
 plt.subplot(232)
 plt.xlabel('Frame ID')
-plt.ylabel('Prediction (degrees)')
+plt.ylabel('Prediction (degrees/sec)')
 plt.plot(timestamp_at_prediction, imu_predictions[:, 1], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 1], label='Groundtruth')
 plt.title('IMU Rotation Y prediction')
@@ -284,7 +292,7 @@ plt.legend()
 
 plt.subplot(233)
 plt.xlabel('Frame ID')
-plt.ylabel('Prediction (degrees)')
+plt.ylabel('Prediction (degrees/sec)')
 plt.plot(timestamp_at_prediction, imu_predictions[:, 2], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 2], label='Groundtruth')
 plt.title('IMU Rotation Z prediction')
@@ -292,7 +300,7 @@ plt.legend()
 
 plt.subplot(234)
 plt.xlabel('Frame ID')
-plt.ylabel('Prediction (degrees)')
+plt.ylabel('Prediction (degrees/sec)')
 plt.plot(timestamp_at_prediction, cvm_predictions[:, 0], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 0], label='Groundtruth')
 plt.title('CVM Rotation X prediction')
@@ -300,7 +308,7 @@ plt.legend()
 
 plt.subplot(235)
 plt.xlabel('Frame ID')
-plt.ylabel('Prediction (degrees)')
+plt.ylabel('Prediction (degrees/sec)')
 plt.plot(timestamp_at_prediction, cvm_predictions[:, 1], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 1], label='Groundtruth')
 plt.title('CVM Rotation Y prediction')
@@ -308,7 +316,7 @@ plt.legend()
 
 plt.subplot(236)
 plt.xlabel('Frame ID')
-plt.ylabel('Prediction (degrees)')
+plt.ylabel('Prediction (degrees/sec)')
 plt.plot(timestamp_at_prediction, cvm_predictions[:, 2], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 2], label='Groundtruth')
 plt.title('CVM Rotation Z prediction')
@@ -320,7 +328,7 @@ plt.figure()
 
 plt.subplot(231)
 plt.xlabel('Frame ID')
-plt.ylabel('Prediction (degrees)')
+plt.ylabel('Prediction (unit/sec)')
 plt.plot(timestamp_at_prediction, imu_predictions[:, 3], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 3], label='Groundtruth')
 plt.title('IMU Translation X prediction')
@@ -328,7 +336,7 @@ plt.legend()
 
 plt.subplot(232)
 plt.xlabel('Frame ID')
-plt.ylabel('Prediction (degrees)')
+plt.ylabel('Prediction (unit/sec)')
 plt.plot(timestamp_at_prediction, imu_predictions[:, 4], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 4], label='Groundtruth')
 plt.title('IMU Translation Y prediction')
@@ -336,7 +344,7 @@ plt.legend()
 
 plt.subplot(233)
 plt.xlabel('Frame ID')
-plt.ylabel('Prediction (degrees)')
+plt.ylabel('Prediction (unit/sec)')
 plt.plot(timestamp_at_prediction, imu_predictions[:, 5], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 5], label='Groundtruth')
 plt.title('IMU Translation Z prediction')
@@ -344,7 +352,7 @@ plt.legend()
 
 plt.subplot(234)
 plt.xlabel('Frame ID')
-plt.ylabel('Prediction (degrees)')
+plt.ylabel('Prediction (unit/sec)')
 plt.plot(timestamp_at_prediction, cvm_predictions[:, 3], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 3], label='Groundtruth')
 plt.title('CVM Translation X prediction')
@@ -352,7 +360,7 @@ plt.legend()
 
 plt.subplot(235)
 plt.xlabel('Frame ID')
-plt.ylabel('Prediction (degrees)')
+plt.ylabel('Prediction (unit/sec)')
 plt.plot(timestamp_at_prediction, cvm_predictions[:, 4], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 4], label='Groundtruth')
 plt.title('CVM Translation Y prediction')
@@ -360,7 +368,7 @@ plt.legend()
 
 plt.subplot(236)
 plt.xlabel('Frame ID')
-plt.ylabel('Prediction (degrees)')
+plt.ylabel('Prediction (unit/sec)')
 plt.plot(timestamp_at_prediction, cvm_predictions[:, 5], label='Prediction')
 plt.plot(timestamp_at_prediction, groundtruth_predictions[:, 5], label='Groundtruth')
 plt.title('CVM Translation Z prediction')
@@ -445,7 +453,6 @@ groundtruth_relative_list = [
     for match_idx in range(len(imu_matches))
 ]
 groundtruth_relative_list.sort()
-print groundtruth_relative_list[:5]
 groundtruth_relative_list = np.asarray(groundtruth_relative_list)
 np.savetxt("gt_relative.csv", groundtruth_relative_list, fmt="%.6f")
 
