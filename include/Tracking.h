@@ -43,6 +43,8 @@
 
 #include <mutex>
 
+#define IMU_SAFE_WINDOW 15 // in seconds
+
 namespace ORB_SLAM2
 {
 
@@ -111,7 +113,8 @@ public:
         NO_IMAGES_YET=0,
         NOT_INITIALIZED=1,
         OK=2,
-        LOST=3
+        LOST=3,
+        IMU_ONLY_TRACKING=4
     };
 
     eTrackingState mState;
@@ -249,6 +252,7 @@ protected:
 protected:
     bool mIsFirstDebug;
     bool mbIsKeyframeTracked;
+    double mTimestampLastLost;
 public:
     bool GetVINSInited();
     cv::Mat GetGravityVec();

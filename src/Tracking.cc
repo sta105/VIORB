@@ -232,8 +232,12 @@ bool Tracking::TrackLocalMapWithIMU(bool bMapUpdated)
     // We retrieve the local map and try to find matches to points in the local map.
 
     UpdateLocalMap();
-
+    
     SearchLocalPoints();
+
+    Frame backupCurrentFrame = mCurrentFrame;
+    Frame backupLastFrame = mLastFrame;
+    cv::Mat backupLastKeyFramePose = mpLastKeyFrame->GetPose();
 
     // Map updated, optimize with last KeyFrame
     if(mpLocalMapper->GetFirstVINSInited() || bMapUpdated)
@@ -329,7 +333,14 @@ bool Tracking::TrackLocalMapWithIMU(bool bMapUpdated)
         return false;
 
     if(mnMatchesInliers<15)
+    {
+        // revert 
+        mCurrentFrame = backupCurrentFrame;
+        mLastFrame = backupLastFrame;
+        mpLastKeyFrame->SetPose(backupLastKeyFramePose);
+
         return false;
+    }
     else
         return true;
 }
@@ -342,7 +353,7 @@ void Tracking::PredictNavStateByIMU(bool bMapUpdated)
     if(mpLocalMapper->GetFirstVINSInited() || bMapUpdated)
     {
         if(mpLocalMapper->GetFirstVINSInited() && !bMapUpdated) cerr<<"2-FirstVinsInit, but not bMapUpdated. shouldn't"<<endl;
-        cout<<"tracking last kf"<<endl;
+        //cout<<"tracking last kf"<<endl;
         saveIMUDataPerImage(true);
         mbIsKeyframeTracked = true;
         // Compute IMU Pre-integration
@@ -433,7 +444,10 @@ bool Tracking::TrackWithIMU(bool bMapUpdated)
     if(nmatches<20)
         return false;
 
-
+    Frame backupCurrentFrame = mCurrentFrame;
+    Frame backupLastFrame = mLastFrame;
+    cv::Mat backupLastKeyFramePose = mpLastKeyFrame->GetPose();
+    
     // Pose optimization. false: no need to compute marginalized for current Frame
     if(mpLocalMapper->GetFirstVINSInited() || bMapUpdated)
     {
@@ -487,10 +501,36 @@ bool Tracking::TrackWithIMU(bool bMapUpdated)
     if(mbOnlyTracking)
     {
         mbVO = nmatchesMap<10;
-        return nmatches>20;
+        // return nmatches>20;
+        if (nmatches>20) 
+        {
+            return true;
+        }
+        else
+        {
+            // revert 
+            mCurrentFrame = backupCurrentFrame;
+            mLastFrame = backupLastFrame;
+            mpLastKeyFrame->SetPose(backupLastKeyFramePose);
+
+            return false;
+        }
     }
 
-    return nmatchesMap>=10;
+    // return nmatchesMap>=10;
+    if (nmatchesMap>=10)
+    {
+        return true;
+    }
+    else
+    {
+        // revert 
+        mCurrentFrame = backupCurrentFrame;
+        mLastFrame = backupLastFrame;
+        mpLastKeyFrame->SetPose(backupLastKeyFramePose);
+
+        return false;
+    }
 }
 
 
@@ -934,6 +974,28 @@ void Tracking::Track()
             {
                 bOK = Relocalization();
                 if(bOK) cout<<"Relocalized. id: "<<mCurrentFrame.mnId<<endl;
+                //only use IMU to propagate the state
+                else if (mState == IMU_ONLY_TRACKING)
+                {
+                    std::cout << std::fixed << std::setprecision(6);
+                    std::cout << "Trying to track with IMU only " << mCurrentFrame.mTimeStamp << std::endl;
+
+                    bOK = TrackWithIMU(true);
+                    if (!bOK)
+                    {
+                        bOK = TrackLocalMapWithIMU(true);
+                    }
+                    else
+                    {
+                        std::cout << "Recovered with IMU only (previous keyframe)!!! " << mCurrentFrame.mTimeStamp << std::endl;
+                    }
+
+                    if (bOK)
+                    {
+                        mState = OK;
+                        std::cout << "Recovered with IMU only (local map)!!! " << mCurrentFrame.mTimeStamp << std::endl;
+                    }
+                }
             }
         }
         else
@@ -964,7 +1026,7 @@ void Tracking::Track()
                     }
                     else
                     {
-                        cout<<"tracking localmap with imu "<<trackingcounts++<<endl;
+                        //cout<<"tracking localmap with imu "<<trackingcounts++<<endl;
                         bOK = TrackLocalMapWithIMU(bMapUpdated);
                     }
                 }
@@ -1016,11 +1078,39 @@ void Tracking::Track()
         }
         else
         {
-            mState=LOST;
+            // mState=LOST;
 
+            if (mpLocalMapper->GetVINSInited() && !mbRelocBiasPrepare)
+            {
+                std::cout << std::fixed << std::setprecision(6);
+                        
+                if (mState == OK)
+                {
+                    mState = IMU_ONLY_TRACKING;
+                    mTimestampLastLost = mCurrentFrame.mTimeStamp;
+
+                    std::cout << "GOING TO IMU ONLY MODE!!!! " << mCurrentFrame.mTimeStamp << std::endl;
+                }
+                else if (mState == IMU_ONLY_TRACKING)
+                {
+                    if (mCurrentFrame.mTimeStamp - mTimestampLastLost > IMU_SAFE_WINDOW)
+                    {
+                        mState = LOST;
+                        std::cout << "QUITTING IMU ONLY MODE!!!! " << mCurrentFrame.mTimeStamp << std::endl;
+                    }
+                    
+                }
+            }
+            else
+            {
+                mState = LOST;
+            }
+            
             // Clear Frame vectors for reloc bias computation
             if(mv20FramesReloc.size()>0)
                 mv20FramesReloc.clear();
+
+            
         }
 
         // Update drawer
@@ -1097,6 +1187,7 @@ void Tracking::Track()
                 mpSystem->Reset();
                 return;
             }
+            //once visual part fails, still use IMU to popagate the state
         }
 
         if(!mCurrentFrame.mpReferenceKF)
