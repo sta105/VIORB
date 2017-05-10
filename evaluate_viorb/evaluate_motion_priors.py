@@ -136,18 +136,21 @@ def findRelativeGroundtruth(relative_pose_dict, reference_timestamp, groundtruth
     matches_dict = dict([(i[1], i[0]) for i in matches])
 
     for pose_t2 in relative_pose_dict:
-        groundtruth_T2 = groundtruth_poses[matches_dict[pose_t2]]
+        try:
+            groundtruth_T2 = groundtruth_poses[matches_dict[pose_t2]]
 
-        pose_t1 = reference_timestamp[pose_t2]
-        groundtruth_T1 = groundtruth_poses[matches_dict[pose_t1]]
+            pose_t1 = reference_timestamp[pose_t2]
+            groundtruth_T1 = groundtruth_poses[matches_dict[pose_t1]]
 
-        relative_T = np.dot(np.linalg.inv(groundtruth_T2), groundtruth_T1)
-        # convert groundtruth to camera frame
-        relative_T = np.dot(
-            np.dot(T_cb, relative_T),
-            T_bc
-        )
-        relative_ground_truth.append( (matches_dict[pose_t2], relative_T) )
+            relative_T = np.dot(np.linalg.inv(groundtruth_T2), groundtruth_T1)
+            # convert groundtruth to camera frame
+            relative_T = np.dot(
+                np.dot(T_cb, relative_T),
+                T_bc
+            )
+            relative_ground_truth.append( (matches_dict[pose_t2], relative_T) )
+        except KeyError:
+            pass
 
     return dict(relative_ground_truth)
 
