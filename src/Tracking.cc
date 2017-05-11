@@ -973,7 +973,10 @@ void Tracking::Track()
             else
             {
                 bOK = Relocalization();
-                if(bOK) cout<<"Relocalized. id: "<<mCurrentFrame.mnId<<endl;
+                if(bOK) 
+                {
+                    cout<<"Relocalized. id: "<<mCurrentFrame.mnId<<endl;
+                }
                 //only use IMU to propagate the state
                 else if (mState == IMU_ONLY_TRACKING)
                 {
@@ -989,6 +992,9 @@ void Tracking::Track()
                     {
                         std::cout << "Recovered with IMU only (previous keyframe)!!! " << mCurrentFrame.mTimeStamp << std::endl;
                     }
+
+                    mpMap->AddIMUTrackedFrames(mCurrentFrame.mTcw);
+                    mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
 
                     if (bOK)
                     {
@@ -1090,6 +1096,7 @@ void Tracking::Track()
                     mTimestampLastLost = mCurrentFrame.mTimeStamp;
 
                     std::cout << "GOING TO IMU ONLY MODE!!!! " << mCurrentFrame.mTimeStamp << std::endl;
+
                 }
                 else if (mState == IMU_ONLY_TRACKING)
                 {
@@ -1098,7 +1105,6 @@ void Tracking::Track()
                         mState = LOST;
                         std::cout << "QUITTING IMU ONLY MODE!!!! " << mCurrentFrame.mTimeStamp << std::endl;
                     }
-                    
                 }
             }
             else
@@ -1941,10 +1947,12 @@ void Tracking::SearchLocalPoints()
         int th = 1;
         if(mSensor==System::RGBD)
             th=3;
-        // If the camera has been relocalised recently, perform a coarser search
-        if(mCurrentFrame.mnId<mnLastRelocFrameId+2)
+        // If the camera has been relocalised recently, or recoverd by IMU, perform a coarser search
+        if(mCurrentFrame.mnId<mnLastRelocFrameId+2||mCurrentFrame.mTimeStamp - mTimestampLastLost < IMU_SAFE_WINDOW)
             th=5;
-        matcher.SearchByProjection(mCurrentFrame,mvpLocalMapPoints,th);
+        int matcherscount;
+        matcherscount=matcher.SearchByProjection(mCurrentFrame,mvpLocalMapPoints,th);
+        cout<<"find " << matcherscount <<" matchers for the current frame"<<endl;
     }
 }
 

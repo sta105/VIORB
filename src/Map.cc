@@ -129,6 +129,18 @@ long unsigned int Map::GetMaxKFid()
     return mnMaxKFid;
 }
 
+std::vector<cv::Mat> Map::GetIMUTrackedFrames()
+{
+    unique_lock<mutex> lock(mMutexMap);
+    return vector<cv::Mat>(mvIMUTrackedFrames.begin(),mvIMUTrackedFrames.end());
+}
+
+void Map::AddIMUTrackedFrames(cv::Mat pose)
+{
+    unique_lock<mutex> lock(mMutexMap);
+    mvIMUTrackedFrames.push_back(pose.clone());
+}
+
 void Map::clear()
 {
     for(set<MapPoint*>::iterator sit=mspMapPoints.begin(), send=mspMapPoints.end(); sit!=send; sit++)

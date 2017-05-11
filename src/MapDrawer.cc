@@ -240,7 +240,9 @@ void MapDrawer::DrawKeyFramesWithGravity(const bool bDrawKF, const bool bDrawGra
 
             glPopMatrix();
         }
+        DrawIMUTrackedFrames(matGravity);
     }
+
 
     if(bDrawGraph)
     {
@@ -289,8 +291,89 @@ void MapDrawer::DrawKeyFramesWithGravity(const bool bDrawKF, const bool bDrawGra
         glEnd();
     }
     
-    // draw the gravity direction here
-    // std::cout << "Gravity Direction: " << std::endl << matGravity << std::endl;
+    
+}
+
+void MapDrawer::DrawIMUTrackedFrames(cv::Mat matGravity)
+{
+    const float &w = mKeyFrameSize;
+    const float h = w*0.75;
+    const float z = w*0.6;
+
+    std::cout << std::endl << std::endl << std::endl;
+    std::vector<cv::Mat> imu_tracked_frames = mpMap->GetIMUTrackedFrames();
+    std::cout << "No of IMU tracked: " << imu_tracked_frames.size() << std::endl;
+    
+    for(size_t i=0; i<imu_tracked_frames.size(); i++)
+    {
+       cv::Mat Tcw= imu_tracked_frames[i];
+
+        if (Tcw.empty())
+        {
+            continue;
+        }
+        
+        cv::Mat Twc = cv::Mat::eye(4, 4, CV_32F);
+        cv::Mat Rwc = Tcw.rowRange(0,3).colRange(0,3).t();
+        cv::Mat twc = -Rwc * Tcw.rowRange(0,3).col(3);
+
+        // cv::Mat Rwc = pF.GetRotationInverse();
+        // cv::Mat twc = pF.GetCameraCenter();
+
+        Rwc.copyTo(Twc.rowRange(0,3).colRange(0,3));
+        twc.copyTo(Twc.rowRange(0,3).col(3));
+
+        std::cout << Twc << std::endl;
+        
+        glPushMatrix();
+
+        glMultMatrixf(Twc.ptr<GLfloat>(0));
+
+        glLineWidth(mKeyFrameLineWidth);
+        glColor3f(1.0f,0.0f,0.0f);
+        glBegin(GL_LINES);
+        glVertex3f(0,0,0);
+        glVertex3f(w,h,z);
+        glVertex3f(0,0,0);
+        glVertex3f(w,-h,z);
+        glVertex3f(0,0,0);
+        glVertex3f(-w,-h,z);
+        glVertex3f(0,0,0);
+        glVertex3f(-w,h,z);
+
+        glVertex3f(w,h,z);
+        glVertex3f(w,-h,z);
+
+        glVertex3f(-w,h,z);
+        glVertex3f(-w,-h,z);
+
+        glVertex3f(-w,h,z);
+        glVertex3f(w,h,z);
+
+        glVertex3f(-w,-h,z);
+        glVertex3f(w,-h,z);
+        glEnd();
+
+        glPopMatrix();
+
+        // draw the gravity direction
+        glPushMatrix();
+        cv::Rect r( 0, 0, 3, 3 ); // the rectangular region corresponding to rotation part
+        cv::Mat R = Twc(r).clone(); 
+        
+        cv::Mat gCamera = R * matGravity;
+
+        glMultMatrixf(Twc.ptr<GLfloat>(0));
+
+        glLineWidth(mKeyFrameLineWidth);
+        glColor3f(1.0f,0.0f,0.0f);
+        glBegin(GL_LINES);
+        glVertex3f(0,0,0);
+        glVertex3f(gCamera.at<float>(0, 0),gCamera.at<float>(1, 0),gCamera.at<float>(2, 0));
+        glEnd();
+
+        glPopMatrix();
+    }
 }
 
 void MapDrawer::DrawCurrentCamera(pangolin::OpenGlMatrix &Twc)

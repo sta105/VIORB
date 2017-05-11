@@ -2131,7 +2131,7 @@ void Optimizer::LocalBundleAdjustmentNavState(KeyFrame *pCurKF, const std::list<
         g2o::EdgeNavStatePVR* e = vpEdgesNavStatePVR[i];
         if(e->chi2()>21.666)
         {
-                        cout<<"2 PVRedge "<<i<<", chi2 "<<e->chi2()<<". ";
+                        //cout<<"2 PVRedge "<<i<<", chi2 "<<e->chi2()<<". ";
                         tmpcnt2++;
         }
 
@@ -2149,7 +2149,7 @@ void Optimizer::LocalBundleAdjustmentNavState(KeyFrame *pCurKF, const std::list<
         g2o::EdgeNavStateBias* e = vpEdgesNavStateBias[i];
         if(e->chi2()>16.812)
         {
-                        cout<<"2 Bias edge "<<i<<", chi2 "<<e->chi2()<<". ";
+                        //cout<<"2 Bias edge "<<i<<", chi2 "<<e->chi2()<<". ";
                         tmpcnt2++;
         }
 

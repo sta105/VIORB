@@ -41,6 +41,7 @@ public:
     void DrawMapPoints();
     void DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph);
     void DrawKeyFramesWithGravity(const bool bDrawKF, const bool bDrawGraph, cv::Mat matGravity);
+    void DrawIMUTrackedFrames(cv::Mat matGravity);
     void DrawCurrentCamera(pangolin::OpenGlMatrix &Twc);
     void SetCurrentCameraPose(const cv::Mat &Tcw);
     void SetReferenceKeyFrame(KeyFrame *pKF);
