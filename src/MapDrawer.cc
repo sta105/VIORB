@@ -300,20 +300,18 @@ void MapDrawer::DrawIMUTrackedFrames(cv::Mat matGravity)
     const float h = w*0.75;
     const float z = w*0.6;
 
-    std::cout << std::endl << std::endl << std::endl;
     std::vector<cv::Mat> imu_tracked_frames = mpMap->GetIMUTrackedFrames();
-    std::cout << "No of IMU tracked: " << imu_tracked_frames.size() << std::endl;
     
     for(size_t i=0; i<imu_tracked_frames.size(); i++)
     {
-       cv::Mat Tcw= imu_tracked_frames[i];
+       cv::Mat Tcw= imu_tracked_frames[i].clone();
 
         if (Tcw.empty())
         {
             continue;
         }
         
-        cv::Mat Twc = cv::Mat::eye(4, 4, CV_32F);
+        cv::Mat Twc = cv::Mat::eye(4, 4, Tcw.type());
         cv::Mat Rwc = Tcw.rowRange(0,3).colRange(0,3).t();
         cv::Mat twc = -Rwc * Tcw.rowRange(0,3).col(3);
 
@@ -322,9 +320,8 @@ void MapDrawer::DrawIMUTrackedFrames(cv::Mat matGravity)
 
         Rwc.copyTo(Twc.rowRange(0,3).colRange(0,3));
         twc.copyTo(Twc.rowRange(0,3).col(3));
+        Twc = Twc.t();
 
-        std::cout << Twc << std::endl;
-        
         glPushMatrix();
 
         glMultMatrixf(Twc.ptr<GLfloat>(0));

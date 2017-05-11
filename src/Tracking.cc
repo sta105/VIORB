@@ -1100,6 +1100,7 @@ void Tracking::Track()
                 }
                 else if (mState == IMU_ONLY_TRACKING)
                 {
+                    cout<<"mCurrentFrame.mTimeStamp: "<<mCurrentFrame.mTimeStamp<< "mTimestampLastLost:" << mTimestampLastLost <<endl;
                     if (mCurrentFrame.mTimeStamp - mTimestampLastLost > IMU_SAFE_WINDOW)
                     {
                         mState = LOST;
@@ -1952,7 +1953,7 @@ void Tracking::SearchLocalPoints()
             th=5;
         int matcherscount;
         matcherscount=matcher.SearchByProjection(mCurrentFrame,mvpLocalMapPoints,th);
-        cout<<"find " << matcherscount <<" matchers for the current frame"<<endl;
+        //cout<<"find " << matcherscount <<" matchers for the current frame"<<endl;
     }
 }
 

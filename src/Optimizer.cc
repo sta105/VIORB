@@ -2058,7 +2058,7 @@ void Optimizer::LocalBundleAdjustmentNavState(KeyFrame *pCurKF, const std::list<
         if(e->chi2()>21.666)
         {
             //e->setLevel(1);
-                        cout<<"1 PVRedge "<<i<<", chi2 "<<e->chi2()<<". ";
+                        //cout<<"1 PVRedge "<<i<<", chi2 "<<e->chi2()<<". ";
                         tmpcnt++;
         }
         //e->setRobustKernel(0);
@@ -2078,7 +2078,7 @@ void Optimizer::LocalBundleAdjustmentNavState(KeyFrame *pCurKF, const std::list<
         if(e->chi2()>16.812)
         {
             //e->setLevel(1);
-                        cout<<"1 Bias edge "<<i<<", chi2 "<<e->chi2()<<". ";
+                        //cout<<"1 Bias edge "<<i<<", chi2 "<<e->chi2()<<". ";
                         tmpcnt++;
         }
         //e->setRobustKernel(0);

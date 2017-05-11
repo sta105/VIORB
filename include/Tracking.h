@@ -43,7 +43,7 @@
 
 #include <mutex>
 
-#define IMU_SAFE_WINDOW 15 // in seconds
+#define IMU_SAFE_WINDOW 3 // in seconds
 
 namespace ORB_SLAM2
 {
