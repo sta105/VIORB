@@ -75,9 +75,9 @@ public:
     // This avoid that two points are created simultaneously in separate threads (id conflict)
     std::mutex mMutexPointCreation;
 
-    std::vector<cv::Mat> mvIMUTrackedFrames;
-    std::vector<cv::Mat> GetIMUTrackedFrames();
-    void AddIMUTrackedFrames(cv::Mat pose);
+    std::vector<cv::Mat> mvIMUTrackedFramesPose;
+    std::vector<cv::Mat> GetIMUTrackedFramesPose();
+    void AddIMUTrackedFramesPose(cv::Mat Tcw);
 
 protected:
     std::set<MapPoint*> mspMapPoints;

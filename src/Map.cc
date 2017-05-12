@@ -129,16 +129,16 @@ long unsigned int Map::GetMaxKFid()
     return mnMaxKFid;
 }
 
-std::vector<cv::Mat> Map::GetIMUTrackedFrames()
+std::vector<cv::Mat> Map::GetIMUTrackedFramesPose()
 {
     unique_lock<mutex> lock(mMutexMap);
-    return vector<cv::Mat>(mvIMUTrackedFrames.begin(),mvIMUTrackedFrames.end());
+    return vector<cv::Mat>(mvIMUTrackedFramesPose.begin(),mvIMUTrackedFramesPose.end());
 }
 
-void Map::AddIMUTrackedFrames(cv::Mat pose)
+void Map::AddIMUTrackedFramesPose(cv::Mat Tcw)
 {
     unique_lock<mutex> lock(mMutexMap);
-    mvIMUTrackedFrames.push_back(pose.clone());
+    mvIMUTrackedFramesPose.push_back(Tcw.inv());
 }
 
 void Map::clear()

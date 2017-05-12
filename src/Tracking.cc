@@ -993,7 +993,7 @@ void Tracking::Track()
                         std::cout << "Recovered with IMU only (previous keyframe)!!! " << mCurrentFrame.mTimeStamp << std::endl;
                     }
 
-                    mpMap->AddIMUTrackedFrames(mCurrentFrame.mTcw);
+                    mpMap->AddIMUTrackedFramesPose(mCurrentFrame.mTcw);
                     mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
 
                     if (bOK)

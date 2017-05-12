@@ -300,26 +300,18 @@ void MapDrawer::DrawIMUTrackedFrames(cv::Mat matGravity)
     const float h = w*0.75;
     const float z = w*0.6;
 
-    std::vector<cv::Mat> imu_tracked_frames = mpMap->GetIMUTrackedFrames();
+    std::vector<cv::Mat> imu_tracked_frames_pose = mpMap->GetIMUTrackedFramesPose();
     
-    for(size_t i=0; i<imu_tracked_frames.size(); i++)
+    for(size_t i=0; i<imu_tracked_frames_pose.size(); i++)
     {
-       cv::Mat Tcw= imu_tracked_frames[i].clone();
+        cv::Mat Twc = imu_tracked_frames_pose[i].clone();
 
-        if (Tcw.empty())
+        if (Twc.empty())
         {
             continue;
         }
         
-        cv::Mat Twc = cv::Mat::eye(4, 4, Tcw.type());
-        cv::Mat Rwc = Tcw.rowRange(0,3).colRange(0,3).t();
-        cv::Mat twc = -Rwc * Tcw.rowRange(0,3).col(3);
-
-        // cv::Mat Rwc = pF.GetRotationInverse();
-        // cv::Mat twc = pF.GetCameraCenter();
-
-        Rwc.copyTo(Twc.rowRange(0,3).colRange(0,3));
-        twc.copyTo(Twc.rowRange(0,3).col(3));
+        // OpenGL requires pose matrix to be column major!!!
         Twc = Twc.t();
 
         glPushMatrix();
