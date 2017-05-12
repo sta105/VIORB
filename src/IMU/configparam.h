@@ -8,6 +8,8 @@
 
 #define RUN_REALTIME
 
+#define USE_BIAS_PRIOR 
+
 namespace ORB_SLAM2
 {
 
@@ -27,6 +29,12 @@ public:
     static int GetLocalWindowSize();
     static double GetImageDelayToIMU();
     static bool GetAccMultiply9p8();
+    
+    // static cv::Mat GetMatAccBias();
+    // static Eigen::Vector3d GetEigAccBias();
+
+    static cv::Mat _MatAccBias;
+    static Eigen::Vector3d _EigAccBias;
 
     static double GetG(){return _g;}
 
@@ -47,6 +55,7 @@ private:
 
     static double _g;
     static double _nVINSInitTime;
+
 };
 
 }

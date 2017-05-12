@@ -13,6 +13,9 @@ double ConfigParam::_ImageDelayToIMU = 0;
 bool ConfigParam::_bAccMultiply9p8 = false;
 double ConfigParam::_nVINSInitTime = 15;
 
+Eigen::Vector3d ConfigParam::_EigAccBias = Eigen::Vector3d::Zero();
+cv::Mat ConfigParam::_MatAccBias = cv::Mat::zeros(3, 1, CV_32F);
+
 ConfigParam::ConfigParam(std::string configfile)
 {
     cv::FileStorage fSettings(configfile, cv::FileStorage::READ);
@@ -72,6 +75,26 @@ ConfigParam::ConfigParam(std::string configfile)
         _bAccMultiply9p8 = (tmpBool != 0);
         std::cout<<"whether acc*9.8? 0/1: "<<_bAccMultiply9p8<<std::endl;
     }
+
+    // acc bias
+    cv::FileNode accBias_ = fSettings["IMU.accBias"];
+    if ( !accBias_.isNone() && (accBias_.size() == 3) )
+    {
+        _EigAccBias << accBias_[0], accBias_[1], accBias_[2];
+        _MatAccBias = cv::Mat::zeros(3, 1, CV_32F);
+        for (int i = 0; i < 3; i++)
+        {
+            _MatAccBias.at<float>(i, 0) = _EigAccBias(i);
+        }
+
+        std::cout << "Acc Bias: " << _EigAccBias.transpose() << std::endl;
+    }
+    else
+    {
+        std::cerr << "Accelerometer bias not in config: setting to zero!!!!" << std::endl;
+        _EigAccBias = Eigen::Vector3d::Zero();
+        _MatAccBias = cv::Mat::zeros(3, 1, CV_32F);
+    }
 }
 
 
@@ -109,5 +132,15 @@ bool ConfigParam::GetAccMultiply9p8()
 {
     return _bAccMultiply9p8;
 }
+
+// cv::Mat ConfigParam::GetMatAccBias()
+// {
+//     return _MatAccBias;
+// }
+
+// Eigen::Vector3d ConfigParam::GetEigAccBias()
+// {
+//     return _EigAccBias;
+// }
 
 }

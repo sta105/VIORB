@@ -41,6 +41,9 @@ Camera.delaytoimu: 0
 # acc=acc*9.8, if below is 1
 IMU.multiplyG: 0
 
+# IMU biases prior
+IMU.accBias: [-0.015405, 0.083486, 0.036469]
+
 # camera-imu frame transformation, Pi = Tic * Pc
 Camera.Tbc:
  [0.0148655429818, -0.999880929698, 0.00414029679422, -0.0216401454975,
@@ -50,6 +53,7 @@ Camera.Tbc:
 
 # Local Window size
 LocalMapping.LocalWindowSize: 10
+
 
 #--------------------------------------------------------------------------------------------
 # Camera Parameters. Adjust them!
