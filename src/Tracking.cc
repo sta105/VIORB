@@ -269,13 +269,13 @@ bool Tracking::TrackLocalMapWithIMU(bool bMapUpdated)
         if(mCurrentFrame.GetNavState().Get_dBias_Gyr().norm() > 1e-6) cerr<<"TrackLocalMapWithIMU current Frame dBias gyr not zero"<<endl;
 
         //debug
-        //saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_beforetracklm.txt");
+        //saveDebugStates("../../../tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_beforetracklm.txt");
 
 
         Optimizer::PoseOptimization(&mCurrentFrame,mpLastKeyFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
 
         mbIsKeyframeTracked = true;
-        saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_aftertracklm.txt");
+        saveDebugStates("../../../tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_aftertracklm.txt");
         //Optimizer::PoseOptimization15DoF(&mCurrentFrame,mpLastKeyFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
 
         //Optimizer::PoseOptimization(&mCurrentFrame,pMapUpdateKF,imupreint,mpLocalMapper->GetGravityVec(),true);
@@ -296,7 +296,7 @@ bool Tracking::TrackLocalMapWithIMU(bool bMapUpdated)
         Optimizer::PoseOptimization(&mCurrentFrame,&mLastFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
 
         mbIsKeyframeTracked = false;
-        saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_aftertracklm.txt");
+        saveDebugStates("../../../tmp/IMUpredic_aftertracklm.txt","../../../tmp/IMUpredict_aftertracklm.txt");
         //Optimizer::PoseOptimization15DoF(&mCurrentFrame,&mLastFrame,imupreint,mpLocalMapper->GetGravityVec(),true);
     }
 
@@ -419,7 +419,7 @@ bool Tracking::TrackWithIMU(bool bMapUpdated)
     // Predict NavState&Pose by IMU
     // And compute the IMU pre-integration for PoseOptimization
     PredictNavStateByIMU(bMapUpdated);
-    saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_beforetrack.txt","../../../tmp/IMUpredict_aftertracklm.txt");
+    saveDebugStates("../../../tmp/IMUpredic_beforetrack.txt","../../../tmp/IMUpredict_aftertracklm.txt");
 
     fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
 
@@ -461,7 +461,7 @@ bool Tracking::TrackWithIMU(bool bMapUpdated)
         //Optimizer::PoseOptimization15DoF(&mCurrentFrame,pMapUpdateKF,mIMUPreIntInTrack,mpLocalMapper->GetGravityVec(),false);
 
         mbIsKeyframeTracked = true;
-        saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_aftertrackkf.txt","../../../tmp/IMUpredict_aftertracklm.txt");
+        saveDebugStates("../../../tmp/IMUpredic_aftertrackkf.txt","../../../tmp/IMUpredict_aftertracklm.txt");
         
     }
     else
@@ -470,12 +470,12 @@ bool Tracking::TrackWithIMU(bool bMapUpdated)
         //Optimizer::PoseOptimization15DoF(&mCurrentFrame,&mLastFrame,mIMUPreIntInTrack,mpLocalMapper->GetGravityVec(),false);
 
         mbIsKeyframeTracked = false;
-        saveDebugStates("/home/sicong/VIORB_new/ORB_SLAM2/tmp/IMUpredic_aftertrackkf.txt","../../../tmp/IMUpredict_aftertracklm.txt");
+        saveDebugStates("../../../tmp/IMUpredic_aftertrackkf.txt","../../../tmp/IMUpredict_aftertracklm.txt");
         
     }
 
     // debug
-     //saveDebugStates("/home/sicong/VIORB/ORB_SLAM2/tmp/IMUpredic_aftertrack.txt","/home/sicong/VIORB/ORB_SLAM2/tmp/IMUpredict_aftertrack.txt");
+     //saveDebugStates("../../../tmp/IMUpredic_aftertrack.txt","../../../tmp/IMUpredict_aftertrack.txt");
 
     // Discard outliers
     int nmatchesMap = 0;

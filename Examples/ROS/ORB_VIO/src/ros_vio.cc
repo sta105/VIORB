@@ -300,8 +300,8 @@ int main(int argc, char **argv)
     SLAM.Shutdown();
 
     // Save camera trajectory
-    SLAM.SaveKeyFrameTrajectoryTUM("/home/sicong/VIORB_new/ORB_SLAM2/tmp/KeyFrameTrajectory.txt");
-    SLAM.SaveKeyFrameTrajectoryNavState("/home/sicong/VIORB_new/ORB_SLAM2/tmp/KeyFrameNavStateTrajectory.txt");
+    SLAM.SaveKeyFrameTrajectoryTUM("../../../tmp/KeyFrameTrajectory.txt");
+    SLAM.SaveKeyFrameTrajectoryNavState("../../../tmp/KeyFrameNavStateTrajectory.txt");
 
     ros::shutdown();
 
