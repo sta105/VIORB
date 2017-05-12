@@ -6,10 +6,10 @@ from math import pi
 
 # inputs
 # from body frame to world
-q_wb = [0.042773,0.816907,-0.063879,0.571623] # w, x, y, z
+q_wb = [0.580736,0.131642,-0.801268,0.058230] # w, x, y, z
 # from random camera (r) to reference camera (c)
 q_cr = [1.0, 0.0, 0.0, 0.0]
-g_r = [0.155649, 9.290025, 3.147590]
+g_r = [0.393351, 8.796344, 4.325011]
 T_bc = [	
 			0.0148655429818, -0.999880929698, 0.00414029679422, -0.0216401454975,
 			0.999557249008, 0.0149672133247, 0.025715529948, -0.064676986768,
@@ -17,6 +17,7 @@ T_bc = [
 			0.0, 0.0, 0.0, 1.0
 		]
 
+# ----------------------------------------- Don't modify anything below this ----------------------------------------- #
 g_absolute = np.asarray([0, 0, -9.8])
 
 R_wb = quat.quat2rotmat(q_wb)
@@ -30,10 +31,15 @@ g_world = np.dot(R_wb,
 	)
 )
 
-print g_world
-print np.arccos(
-	np.dot(g_world/np.linalg.norm(g_world), g_absolute/np.linalg.norm(g_absolute))
-) * 180 / pi
+print 	'Estimated Gravity inertial frame:', \
+		g_world, \
+		'(should be [0, 0, -9.8])'
+
+print 	'Error in gravity estimation:', \
+		np.arccos( 
+			np.dot(g_world/np.linalg.norm(g_world), g_absolute/np.linalg.norm(g_absolute))
+		) * 180 / pi, \
+		'degrees'
 
 
 

@@ -13,5 +13,5 @@ list = [(float(l[0]),l[1:]) for l in list if len(l)>1]
 # convert nanoseconds to seconds
 list = map(lambda x: ["%.6f"%(x[0]/1e9)] + x[1], list)
 
-with open(filename + '2', 'w') as file:
+with open(filename + '_tum', 'w') as file:
 	file.writelines(' '.join(str(j) for j in i) + '\n' for i in list)
