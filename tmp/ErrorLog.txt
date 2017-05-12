@@ -1,0 +1,8 @@
+Before fixing bias
+Gravity error: 10.5 degree
+Scale: 1.306484
+
+Gravity error: 0.312045244792 degrees
+scale: 1.002909
+
+After fixing bias
